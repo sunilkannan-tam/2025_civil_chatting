@@ -1,5 +1,28 @@
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.models import User
 from .models import Chat, Message, FriendRequest, UserProfile
+
+
+class UserProfileInline(admin.StackedInline):
+    model = UserProfile
+    can_delete = False
+    verbose_name_plural = 'Profile'
+
+
+class UserAdmin(BaseUserAdmin):
+    inlines = [UserProfileInline]
+    list_display = ('username', 'email', 'is_staff', 'is_superuser', 'is_active')
+    list_filter = ('is_staff', 'is_superuser', 'is_active')
+    search_fields = ('username', 'email')
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+# Re-register User with custom admin that includes profile and delete
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)
 
 
 class MessageInline(admin.TabularInline):
@@ -39,6 +62,6 @@ class FriendRequestAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'is_online', 'last_active')
+    list_display = ('user', 'profile_picture', 'is_online', 'last_active')
     list_filter = ('is_online',)
     search_fields = ('user__username',)

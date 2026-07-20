@@ -1,58 +1,65 @@
 import { useState, useEffect, useRef } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000'
 
-const EMOJIS = ['😀','😂','❤️','🔥','👍','🎉','😍','✨','💯','🙏','🥺','🤣','💪','😎','🌟','🤩','😊','💕','🤗','😅','💀','☀️','🌈','⭐','🍕','🎶','⚡','🌸','😜','🤔']
+function Avatar({ user, size = 40, className = '' }) {
+  const photoUrl = user?.profile?.profile_picture
 
-function App() {
-  const [user, setUser] = useState(null)
-  const [token, setToken] = useState(localStorage.getItem('token'))
-
-  useEffect(() => {
-    if (token) fetchCurrentUser()
-  }, [token])
-
-  const fetchCurrentUser = async () => {
-    try {
-      const res = await fetch(`${API_URL}/user/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      if (res.ok) setUser(await res.json())
-      else handleLogout()
-    } catch (err) { handleLogout() }
-  }
-
-  const handleLogout = () => {
-    localStorage.removeItem('token')
-    localStorage.removeItem('refresh')
-    setToken(null)
-    setUser(null)
+  if (photoUrl) {
+    const imgUrl = photoUrl.startsWith('http') ? photoUrl : `${MEDIA_URL}${photoUrl}`
+    return (
+      <img
+        src={imgUrl}
+        alt={user?.username || ''}
+        className={className}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: '50%',
+          objectFit: 'cover',
+          minWidth: size,
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        }}
+        onError={(e) => {
+          e.target.style.display = 'none'
+          const fallback = document.createElement('div')
+          fallback.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);color:white;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:${size*0.45}px;min-width:${size}px`
+          fallback.textContent = (user?.username?.[0] || '?').toUpperCase()
+          e.target.parentElement?.appendChild(fallback)
+        }}
+      />
+    )
   }
 
   return (
-    <Router>
-      <div className="app">
-        <Routes>
-          <Route path="/login" element={
-            !user ? <Login setToken={setToken} setUser={setUser} /> : <Navigate to="/" />
-          } />
-          <Route path="/register" element={
-            !user ? <Register /> : <Navigate to="/" />
-          } />
-          <Route path="/" element={
-            user ? <ChatDashboard user={user} token={token} handleLogout={handleLogout} /> : <Navigate to="/login" />
-          } />
-        </Routes>
-      </div>
-    </Router>
+    <div
+      className={className}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        color: 'white',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontWeight: 700,
+        fontSize: size * 0.45,
+        minWidth: size,
+      }}
+    >
+      {(user?.username?.[0] || '?').toUpperCase()}
+    </div>
   )
 }
 
-function Login({ setToken, setUser }) {
+const EMOJIS = ['😀','😂','❤️','🔥','👍','🎉','😍','✨','💯','🙏','🥺','🤣','💪','😎','🌟','🤩','😊','💕','🤗','😅','💀','☀️','🌈','⭐','🍕','🎶','⚡','🌸','😜','🤔']
+
+function Login({ setUser, setToken }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -77,7 +84,10 @@ function Login({ setToken, setUser }) {
         const userRes = await fetch(`${API_URL}/user/`, {
           headers: { 'Authorization': `Bearer ${data.access}` }
         })
-        if (userRes.ok) setUser(await userRes.json())
+        if (userRes.ok) {
+          const userData = await userRes.json()
+          setUser(userData)
+        }
       } else {
         setError('Invalid credentials')
       }
@@ -112,7 +122,7 @@ function Login({ setToken, setUser }) {
   )
 }
 
-function Register() {
+function Register({ setUser, setToken }) {
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -136,7 +146,8 @@ function Register() {
         setSuccess('Account created! Redirecting to login...')
         setTimeout(() => navigate('/login'), 1500)
       } else {
-        setError('Username already exists')
+        const errData = await res.json()
+        setError(errData.username?.[0] || 'Username already exists')
       }
     } catch (err) { setError('Something went wrong') }
     finally { setLoading(false) }
@@ -748,6 +759,80 @@ function ChatDashboard({ user, token, handleLogout }) {
         )}
       </div>
     </div>
+  )
+}
+
+function App() {
+  const [user, setUser] = useState(null)
+  const [token, setToken] = useState(localStorage.getItem('token'))
+
+  useEffect(() => {
+    if (token && !user) {
+      fetchCurrentUser()
+    }
+  }, [token])
+
+  const fetchCurrentUser = async () => {
+    try {
+      const res = await fetch(`${API_URL}/user/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const userData = await res.json()
+        setUser(userData)
+      } else {
+        // Token invalid, clear it
+        localStorage.removeItem('token')
+        localStorage.removeItem('refresh')
+        setToken(null)
+        setUser(null)
+      }
+    } catch (err) {
+      console.error('Failed to fetch user:', err)
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('refresh')
+    setToken(null)
+    setUser(null)
+  }
+
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          token && user ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Login setUser={setUser} setToken={setToken} />
+          )
+        }
+      />
+      <Route
+        path="/register"
+        element={
+          token && user ? (
+            <Navigate to="/" replace />
+          ) : (
+            <Register setUser={setUser} setToken={setToken} />
+          )
+        }
+      />
+      <Route
+        path="/"
+        element={
+          token && user ? (
+            <ChatDashboard user={user} token={token} handleLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 

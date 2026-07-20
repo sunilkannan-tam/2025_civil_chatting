@@ -4,17 +4,33 @@ from .models import Chat, Message, FriendRequest, UserProfile
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    profile_picture = serializers.SerializerMethodField()
+
     class Meta:
         model = UserProfile
-        fields = ['is_online', 'last_active']
+        fields = ['profile_picture', 'is_online', 'last_active']
+
+    def get_profile_picture(self, obj):
+        if obj.profile_picture:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.profile_picture.url)
+            return obj.profile_picture.url
+        return None
 
 
 class UserSerializer(serializers.ModelSerializer):
-    profile = UserProfileSerializer(read_only=True)
+    profile = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = ['id', 'username', 'email', 'profile']
+
+    def get_profile(self, obj):
+        profile = getattr(obj, 'profile', None)
+        if profile:
+            return UserProfileSerializer(profile, context=self.context).data
+        return None
 
 
 class FriendRequestSerializer(serializers.ModelSerializer):
