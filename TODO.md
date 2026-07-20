@@ -1,23 +1,18 @@
-# TODO: Account Settings with OTP Verification
+# Admin User Management & Deployment Plan
 
 ## Backend
-- [x] 1. Update UserProfile model (phone_number, email_verified, phone_verified)
-- [x] 2. Create OTP model (user, otp_code, type, created_at, is_used)
-- [x] 3. Create migrations
-- [x] 4. Update admin.py (register OTP model, show new UserProfile fields)
-- [x] 5. Update serializers.py (OTP serializers, ProfileUpdateSerializer)
-- [x] 6. Create OTP views (send/verify for email and phone)
-- [x] 7. Create ProfileUpdateView
-- [x] 8. Update urls.py with new routes
-- [x] 9. Run migrations
+- [x] 1. Add `is_superuser` field to UserSerializer (so frontend can detect admins)
+- [x] 2. Add AdminUserListView (list all users - superuser only)
+- [x] 3. Add AdminDeleteUserView (delete user + profile + messages + chats + friend requests)
+- [x] 4. Add admin routes to urls.py
 
-## Frontend
-- [x] 10. Add Settings component to App.jsx
-- [x] 11. Add /settings route
-- [x] 12. Add settings icon to sidebar
-- [x] 13. Add Settings styles to App.css
-- [x] 14. Test all use cases
+## Frontend  
+- [x] 5. Create AdminPanel component (user list, delete buttons, confirm dialog)
+- [x] 6. Add admin route in App.jsx routing
+- [x] 7. Add admin icon in sidebar (visible only to superusers)
 
-## Git
-- [x] 15. Commit and push to GitHub
+## Testing & Deployment
+- [x] 8. Test all use cases locally
+- [x] 9. Push to GitHub master branch
+- [x] 10. Render auto-deploys from master
 

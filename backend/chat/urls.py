@@ -19,4 +19,8 @@ urlpatterns = [
     path('profile/send-otp/', views.OTPSendView.as_view(), name='send-otp'),
     path('profile/verify-otp/', views.OTPVerifyView.as_view(), name='verify-otp'),
     path('change-password/', views.ChangePasswordView.as_view(), name='change-password'),
+
+    # Admin routes
+    path('admin/users/', views.AdminUserListView.as_view(), name='admin-user-list'),
+    path('admin/users/<int:pk>/delete/', views.AdminDeleteUserView.as_view(), name='admin-delete-user'),
 ]

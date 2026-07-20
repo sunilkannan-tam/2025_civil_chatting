@@ -276,3 +276,57 @@ class ChangePasswordView(APIView):
         return Response({
             'message': 'Password changed successfully'
         })
+
+
+class AdminUserListView(APIView):
+    """
+    List all users in the system. Admin-only (superuser).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_superuser:
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+        users = User.objects.all().order_by('username')
+        serializer = UserSerializer(users, many=True, context={'request': request})
+        return Response(serializer.data)
+
+
+class AdminDeleteUserView(APIView):
+    """
+    Delete a user and all associated data. Admin-only (superuser).
+    Cannot delete yourself.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, pk):
+        if not request.user.is_superuser:
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+        if request.user.id == pk:
+            return Response({'error': 'You cannot delete yourself'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user_to_delete = User.objects.get(id=pk)
+        except User.DoesNotExist:
+            raise NotFound('User not found')
+
+        # Prevent deleting other superusers
+        if user_to_delete.is_superuser:
+            return Response({'error': 'Cannot delete another admin user'}, status=status.HTTP_403_FORBIDDEN)
+
+        username = user_to_delete.username
+
+        # Delete all associated data
+        UserProfile.objects.filter(user=user_to_delete).delete()
+        OTP.objects.filter(user=user_to_delete).delete()
+        FriendRequest.objects.filter(Q(from_user=user_to_delete) | Q(to_user=user_to_delete)).delete()
+        Message.objects.filter(sender=user_to_delete).delete()
+        Chat.objects.filter(Q(user1=user_to_delete) | Q(user2=user_to_delete)).delete()
+
+        # Delete the user
+        user_to_delete.delete()
+
+        return Response({
+            'message': f'User "{username}" has been deleted successfully'
+        }, status=status.HTTP_200_OK)

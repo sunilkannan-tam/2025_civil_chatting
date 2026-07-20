@@ -1030,3 +1030,197 @@ body {
     padding: 0.85rem;
   }
 }
+
+/* Admin Panel Styles */
+.admin-page .settings-section h3 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-user-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.admin-user-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-user-item:hover {
+  border-color: #667eea;
+  box-shadow: var(--shadow-md);
+}
+
+.admin-user-item.admin-user-self {
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+  border-color: #667eea;
+}
+
+.admin-user-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.admin-user-details {
+  min-width: 0;
+}
+
+.admin-user-name {
+  font-weight: 700;
+  color: var(--text-dark);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-user-email {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-top: 0.15rem;
+}
+
+.admin-user-status {
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+
+.admin-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: var(--primary);
+  color: white;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.you-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: var(--accent-green);
+  color: #052e16;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.admin-user-actions {
+  flex-shrink: 0;
+  margin-left: 1rem;
+}
+
+.admin-delete-btn {
+  padding: 0.55rem 1rem;
+  background: linear-gradient(135deg, #f5576c, #f093fb);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.admin-delete-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(245, 87, 108, 0.3);
+}
+
+.admin-confirm-delete {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #991b1b;
+  white-space: nowrap;
+}
+
+.admin-confirm-yes {
+  padding: 0.35rem 0.75rem;
+  background: linear-gradient(135deg, #43e97b, #38f9d7);
+  color: #052e16;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.admin-confirm-yes:hover {
+  transform: scale(1.1);
+}
+
+.admin-confirm-no {
+  padding: 0.35rem 0.75rem;
+  background: var(--text-light);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.admin-confirm-no:hover {
+  background: #4a5568;
+}
+
+@media (max-width: 600px) {
+  .admin-user-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+  
+  .admin-user-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .admin-confirm-delete {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .admin-delete-btn {
+    width: 100%;
+  }
+}

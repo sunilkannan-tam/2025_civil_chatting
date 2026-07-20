@@ -526,6 +526,7 @@ function ChatDashboard({ user, token, handleLogout }) {
         <div className="sidebar-header">
           <h2>💬 Chats</h2>
           <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {user.is_superuser && <button onClick={() => navigate('/admin')} className="settings-icon-btn" title="Admin Panel">👑</button>}
             <button onClick={() => navigate('/settings')} className="settings-icon-btn" title="Settings">⚙️</button>
             <button onClick={handleLogout} className="logout-btn">Logout</button>
           </div>
@@ -760,6 +761,143 @@ function ChatDashboard({ user, token, handleLogout }) {
             )}
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+function AdminPanel({ user, token }) {
+  const navigate = useNavigate()
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null)
+  const [message, setMessage] = useState({ type: '', text: '' })
+
+  const showMsg = (type, text) => {
+    setMessage({ type, text })
+    setTimeout(() => setMessage({ type: '', text: '' }), 4000)
+  }
+
+  useEffect(() => {
+    fetchUsers()
+  }, [])
+
+  const fetchUsers = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/admin/users/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        setUsers(await res.json())
+      } else {
+        const err = await res.json()
+        showMsg('error', err.error || 'Failed to load users')
+      }
+    } catch (err) {
+      showMsg('error', 'Failed to load users')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteUser = async (userId) => {
+    setDeletingId(userId)
+    try {
+      const res = await fetch(`${API_URL}/admin/users/${userId}/delete/`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (res.ok) {
+        showMsg('success', data.message)
+        setUsers(prev => prev.filter(u => u.id !== userId))
+        setConfirmDelete(null)
+      } else {
+        showMsg('error', data.error || 'Failed to delete user')
+      }
+    } catch (err) {
+      showMsg('error', 'Failed to delete user')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  return (
+    <div className="settings-page admin-page">
+      <div className="settings-header">
+        <button onClick={() => navigate('/')} className="settings-back-btn">← Back to Chat</button>
+        <h2>👑 Admin Panel</h2>
+      </div>
+
+      {message.text && (
+        <div className={`settings-message settings-message-${message.type}`}>
+          {message.text}
+        </div>
+      )}
+
+      <div className="settings-content">
+        <div className="settings-section">
+          <h3>All Users ({users.length})</h3>
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <div className="loading-spinner"></div>
+              <p style={{ color: '#718096', marginTop: '0.5rem' }}>Loading users...</p>
+            </div>
+          ) : (
+            <div className="admin-user-list">
+              {users.map(u => (
+                <div key={u.id} className={`admin-user-item ${u.is_superuser ? 'admin-user-self' : ''}`}>
+                  <div className="admin-user-info">
+                    <div className="admin-user-avatar">
+                      {u.username[0].toUpperCase()}
+                    </div>
+                    <div className="admin-user-details">
+                      <div className="admin-user-name">
+                        {u.username}
+                        {u.is_superuser && <span className="admin-badge">Admin</span>}
+                        {user.id === u.id && <span className="you-badge">You</span>}
+                      </div>
+                      <div className="admin-user-email">{u.email || 'No email'}</div>
+                      <div className={`admin-user-status ${u.profile?.is_online ? 'status-online' : 'status-offline'}`}>
+                        {u.profile?.is_online ? '● Online' : '○ Offline'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="admin-user-actions">
+                    {confirmDelete === u.id ? (
+                      <div className="admin-confirm-delete">
+                        <span>Delete {u.username}?</span>
+                        <button
+                          onClick={() => handleDeleteUser(u.id)}
+                          disabled={deletingId === u.id}
+                          className="admin-confirm-yes"
+                        >
+                          {deletingId === u.id ? <span className="spinner"></span> : '✓ Yes'}
+                        </button>
+                        <button onClick={() => setConfirmDelete(null)} className="admin-confirm-no">✕ No</button>
+                      </div>
+                    ) : (
+                      !u.is_superuser && user.id !== u.id && (
+                        <button
+                          onClick={() => setConfirmDelete(u.id)}
+                          className="admin-delete-btn"
+                          title="Delete user"
+                        >
+                          🗑️ Delete
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              ))}
+              {users.length === 0 && (
+                <p style={{ textAlign: 'center', color: '#718096', padding: '2rem' }}>No users found.</p>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
@@ -1125,6 +1263,16 @@ function App() {
             <Settings user={user} token={token} />
           ) : (
             <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          token && user && user.is_superuser ? (
+            <AdminPanel user={user} token={token} />
+          ) : (
+            <Navigate to="/" replace />
           )
         }
       />
