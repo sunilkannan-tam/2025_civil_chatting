@@ -1,0 +1,49 @@
+services:
+  # Backend Web Service (Django + Channels)
+  - type: web
+    name: civil-2026-chatting-backend
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: ./build.sh
+    startCommand: daphne chat_project.asgi:application --port $PORT --bind 0.0.0.0 -v2
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: civil-2026-chatting-db
+          property: connectionString
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://civil-2026-chatting.onrender.com"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://civil-2026-chatting.onrender.com"
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+  # Frontend Static Site
+  - type: web
+    name: civil-2026-chatting-frontend
+    env: static
+    region: oregon
+    plan: free
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://civil-2026-chatting-backend.onrender.com/api
+      - key: VITE_WS_URL
+        value: wss://civil-2026-chatting-backend.onrender.com/ws
+
+databases:
+  - name: civil-2026-chatting-db
+    region: oregon
+    plan: free
+    databaseName: civil_chatting
+    user: civil_user
+    ipAllowList: []
+

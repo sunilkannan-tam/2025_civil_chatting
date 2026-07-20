@@ -4,6 +4,7 @@ import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
+const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000'
 
 const EMOJIS = ['😀','😂','❤️','🔥','👍','🎉','😍','✨','💯','🙏','🥺','🤣','💪','😎','🌟','🤩','😊','💕','🤗','😅','💀','☀️','🌈','⭐','🍕','🎶','⚡','🌸','😜','🤔']
 
@@ -446,7 +447,7 @@ function ChatDashboard({ user, token, handleLogout }) {
 
   const renderMessageContent = (msg) => {
     if (msg.file) {
-      const fileUrl = msg.file.startsWith('http') ? msg.file : `http://localhost:8000${msg.file}`
+      const fileUrl = msg.file.startsWith('http') ? msg.file : `${MEDIA_URL}${msg.file}`
       const fileIcon = getFileIcon(msg.file_type, msg.file_name)
 
       if (msg.file_type === 'image') {
