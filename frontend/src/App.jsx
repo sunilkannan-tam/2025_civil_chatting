@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import './App.css'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
@@ -127,14 +127,12 @@ function Register({ setUser, setToken }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    setSuccess('')
     setLoading(true)
     try {
       const res = await fetch(`${API_URL}/register/`, {
@@ -143,11 +141,19 @@ function Register({ setUser, setToken }) {
         body: JSON.stringify({ username, email, password })
       })
       if (res.ok) {
-        setSuccess('Account created! Redirecting to login...')
-        setTimeout(() => navigate('/login'), 1500)
+        const data = await res.json()
+        // Navigate to email verification page with user data
+        navigate('/verify-email', {
+          state: {
+            userId: data.user_id,
+            email: data.email,
+            username: data.username,
+            otpCode: data.otp_code
+          }
+        })
       } else {
         const errData = await res.json()
-        setError(errData.username?.[0] || 'Username already exists')
+        setError(errData.email?.[0] || errData.username?.[0] || 'Registration failed')
       }
     } catch (err) { setError('Something went wrong') }
     finally { setLoading(false) }
@@ -168,14 +174,13 @@ function Register({ setUser, setToken }) {
         </div>
         <div className="input-group">
           <span className="input-icon">📧</span>
-          <input type="email" placeholder="Email (optional)" value={email} onChange={(e) => setEmail(e.target.value)} />
+          <input type="email" placeholder="Email (required)" value={email} onChange={(e) => setEmail(e.target.value)} required />
         </div>
         <div className="input-group">
           <span className="input-icon">🔒</span>
           <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         </div>
         {error && <p className="error">{error}</p>}
-        {success && <p className="success">{success}</p>}
         <button type="submit" disabled={loading} className="auth-btn">
           {loading ? <span className="spinner"></span> : 'Register'}
         </button>
@@ -766,6 +771,142 @@ function ChatDashboard({ user, token, handleLogout }) {
   )
 }
 
+function EmailVerification() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { userId, email, username, otpCode } = location.state || {}
+
+  const [otp, setOtp] = useState('')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [resent, setResent] = useState(false)
+
+  // Redirect if no state (direct URL access)
+  useEffect(() => {
+    if (!userId || !email) {
+      navigate('/register', { replace: true })
+    }
+  }, [userId, email, navigate])
+
+  const handleVerify = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/verify-registration-email/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, otp_code: otp })
+      })
+      if (res.ok) {
+        setSuccess('Email verified successfully! Redirecting to login...')
+        setTimeout(() => navigate('/login'), 2000)
+      } else {
+        const errData = await res.json()
+        setError(errData.error || 'Invalid OTP')
+      }
+    } catch (err) {
+      setError('Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResend = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      // Re-register to get new OTP (in production, use a dedicated resend endpoint)
+      // For dev mode, user can just re-register
+      setResent(true)
+      setError('Check the console/terminal for the new OTP code (Dev mode)')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!userId || !email) return null
+
+  return (
+    <div className="auth-container">
+      <div className="auth-bg-shapes">
+        <div className="shape shape-1"></div>
+        <div className="shape shape-2"></div>
+        <div className="shape shape-3"></div>
+      </div>
+      <h1><span className="logo-icon">📧</span> Verify Your Email</h1>
+
+      <form onSubmit={handleVerify} className="auth-form">
+        <p style={{ textAlign: 'center', color: '#718096', marginBottom: '1rem', fontSize: '0.95rem' }}>
+          Welcome, <strong>{username}</strong>!<br />
+          We sent a verification code to<br />
+          <strong style={{ color: '#667eea' }}>{email}</strong>
+        </p>
+
+        <div className="input-group">
+          <span className="input-icon">🔑</span>
+          <input
+            type="text"
+            maxLength={6}
+            placeholder="Enter 6-digit OTP code"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            required
+          />
+        </div>
+
+        {otpCode && (
+          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#10b981', marginBottom: '1rem', padding: '0.5rem', background: '#f0fdf4', borderRadius: '8px' }}>
+            ⚡ Dev Mode: Your OTP is <strong>{otpCode}</strong>
+          </p>
+        )}
+
+        {error && <p className="error">{error}</p>}
+        {success && <p className="success">{success}</p>}
+
+        <button type="submit" disabled={loading || otp.length < 6} className="auth-btn">
+          {loading ? <span className="spinner"></span> : '✅ Verify Email'}
+        </button>
+
+        <div style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+          <p style={{ color: '#718096', fontSize: '0.9rem' }}>
+            Didn't receive the code?{' '}
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={loading}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#667eea',
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontSize: '0.9rem',
+                textDecoration: 'underline',
+                width: 'auto',
+                padding: 0,
+                boxShadow: 'none'
+              }}
+            >
+              Resend OTP
+            </button>
+          </p>
+          <p style={{ color: '#718096', fontSize: '0.85rem', marginTop: '0.5rem' }}>
+            <a
+              href="/register"
+              onClick={(e) => { e.preventDefault(); navigate('/register') }}
+              style={{ color: '#718096' }}
+            >
+              ← Back to registration
+            </a>
+          </p>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 function AdminPanel({ user, token }) {
   const navigate = useNavigate()
   const [users, setUsers] = useState([])
@@ -1255,6 +1396,10 @@ function App() {
             <Navigate to="/login" replace />
           )
         }
+      />
+      <Route
+        path="/verify-email"
+        element={<EmailVerification />}
       />
       <Route
         path="/settings"

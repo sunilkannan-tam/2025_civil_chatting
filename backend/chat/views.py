@@ -23,6 +23,77 @@ class RegisterView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]
     serializer_class = RegisterSerializer
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        # Auto-generate email OTP for registration verification
+        otp_code = str(random.randint(100000, 999999))
+        OTP.objects.create(
+            user=user,
+            otp_code=otp_code,
+            otp_type='email'
+        )
+
+        print(f"Registration OTP for {user.username}: {otp_code}")
+
+        return Response({
+            'user_id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'message': 'Account created! Please verify your email.',
+            'otp_code': otp_code,  # Remove in production!
+        }, status=status.HTTP_201_CREATED)
+
+
+class RegistrationOTPVerifyView(APIView):
+    """
+    Verify email OTP during registration. Accessible without authentication.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        user_id = request.data.get('user_id')
+        otp_code = request.data.get('otp_code')
+
+        if not user_id or not otp_code:
+            return Response({'error': 'user_id and otp_code are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Find a matching, unused email OTP from the last 10 minutes
+        time_threshold = timezone.now() - timezone.timedelta(minutes=10)
+        otp_obj = OTP.objects.filter(
+            user=user,
+            otp_type='email',
+            otp_code=otp_code,
+            is_used=False,
+            created_at__gte=time_threshold
+        ).last()
+
+        if not otp_obj:
+            return Response({
+                'error': 'Invalid or expired OTP'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Mark OTP as used
+        otp_obj.is_used = True
+        otp_obj.save()
+
+        # Mark email as verified
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        profile.email_verified = True
+        profile.save()
+
+        return Response({
+            'message': 'Email verified successfully! You can now log in.',
+            'email_verified': True
+        })
+
 
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
