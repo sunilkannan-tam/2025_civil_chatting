@@ -15,4 +15,3 @@ python manage.py collectstatic --noinput
 
 # Create superuser if not exists (optional - for admin access)
 echo "from django.contrib.auth.models import User; User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin123')" | python manage.py shell
-
