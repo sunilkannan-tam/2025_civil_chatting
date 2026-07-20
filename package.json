@@ -1,0 +1,10 @@
+{
+  "name": "civil-2026-chatting",
+  "version": "1.0.0",
+  "description": "Civil_2026 Chatting - Real-time private chat app with Django backend and React frontend",
+  "scripts": {
+    "dev:backend": "cd backend && venv\\Scripts\\python.exe manage.py runserver",
+    "dev:frontend": "cd frontend && npm run dev",
+    "install:all": "cd backend && pip install -r requirements.txt && cd ../frontend && npm install"
+  }
+}

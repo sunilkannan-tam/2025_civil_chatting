@@ -1,0 +1,98 @@
+from rest_framework import serializers
+from django.contrib.auth.models import User
+from .models import Chat, Message, FriendRequest, UserProfile
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['is_online', 'last_active']
+
+
+class UserSerializer(serializers.ModelSerializer):
+    profile = UserProfileSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'profile']
+
+
+class FriendRequestSerializer(serializers.ModelSerializer):
+    from_user = UserSerializer(read_only=True)
+    to_user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = FriendRequest
+        fields = ['id', 'from_user', 'to_user', 'is_accepted', 'created_at']
+
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Message
+        fields = ['id', 'chat', 'sender', 'text', 'file', 'file_type', 'file_name', 'file_size', 'timestamp', 'is_read', 'read_at']
+        read_only_fields = ['chat', 'sender', 'timestamp', 'file_type', 'file_name', 'file_size']
+
+    def create(self, validated_data):
+        request = self.context.get('request')
+        file_obj = request.FILES.get('file') if request and request.FILES else None
+        
+        if file_obj:
+            # Determine file type
+            content_type = file_obj.content_type or ''
+            ext = file_obj.name.split('.')[-1].lower() if '.' in file_obj.name else ''
+            
+            if content_type.startswith('image/') or ext in ('jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'):
+                file_type = 'image'
+            elif content_type.startswith('video/') or ext in ('mp4', 'webm', 'avi', 'mov', 'mkv', 'flv'):
+                file_type = 'video'
+            elif content_type.startswith('audio/') or ext in ('mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a'):
+                file_type = 'audio'
+            elif ext in ('apk', 'zip', 'rar', '7z', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'):
+                file_type = 'document'
+            else:
+                file_type = 'other'
+                
+            validated_data['file_type'] = file_type
+            validated_data['file_name'] = file_obj.name
+            validated_data['file_size'] = file_obj.size
+        
+        return super().create(validated_data)
+
+
+class ChatSerializer(serializers.ModelSerializer):
+    other_user = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Chat
+        fields = ['id', 'other_user', 'last_message', 'created_at']
+
+    def get_other_user(self, obj):
+        user = self.context['request'].user
+        if obj.user1 == user:
+            return UserSerializer(obj.user2).data
+        return UserSerializer(obj.user1).data
+
+    def get_last_message(self, obj):
+        last_msg = obj.messages.order_by('-timestamp').first()
+        if last_msg:
+            return MessageSerializer(last_msg).data
+        return None
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'password']
+
+    def create(self, validated_data):
+        user = User.objects.create_user(
+            username=validated_data['username'],
+            email=validated_data.get('email', ''),
+            password=validated_data['password']
+        )
+        return user
