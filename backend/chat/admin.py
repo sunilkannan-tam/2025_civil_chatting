@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Chat, Message, FriendRequest, UserProfile
+from .models import Chat, Message, FriendRequest, UserProfile, OTP
 
 
 class UserProfileInline(admin.StackedInline):
@@ -62,6 +62,14 @@ class FriendRequestAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ('user', 'profile_picture', 'is_online', 'last_active')
-    list_filter = ('is_online',)
-    search_fields = ('user__username',)
+    list_display = ('user', 'profile_picture', 'phone_number', 'email_verified', 'phone_verified', 'is_online', 'last_active')
+    list_filter = ('is_online', 'email_verified', 'phone_verified')
+    search_fields = ('user__username', 'phone_number')
+
+
+@admin.register(OTP)
+class OTPAdmin(admin.ModelAdmin):
+    list_display = ('user', 'otp_code', 'otp_type', 'is_used', 'created_at')
+    list_filter = ('otp_type', 'is_used', 'created_at')
+    search_fields = ('user__username', 'otp_code')
+    readonly_fields = ('created_at',)

@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import Chat, Message, FriendRequest, UserProfile
+from django.contrib.auth.password_validation import validate_password
+from .models import Chat, Message, FriendRequest, UserProfile, OTP
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -8,7 +9,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ['profile_picture', 'is_online', 'last_active']
+        fields = ['profile_picture', 'is_online', 'last_active', 'phone_number', 'email_verified', 'phone_verified']
 
     def get_profile_picture(self, obj):
         if obj.profile_picture:
@@ -112,3 +113,39 @@ class RegisterSerializer(serializers.ModelSerializer):
             password=validated_data['password']
         )
         return user
+
+
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserProfile
+        fields = ['profile_picture', 'phone_number']
+
+    def update(self, instance, validated_data):
+        instance.profile_picture = validated_data.get('profile_picture', instance.profile_picture)
+        instance.phone_number = validated_data.get('phone_number', instance.phone_number)
+        instance.save()
+        return instance
+
+
+class OTPSendSerializer(serializers.Serializer):
+    otp_type = serializers.ChoiceField(choices=['email', 'phone'])
+    value = serializers.CharField()  # email address or phone number
+
+    class Meta:
+        fields = ['otp_type', 'value']
+
+
+class OTPVerifySerializer(serializers.Serializer):
+    otp_type = serializers.ChoiceField(choices=['email', 'phone'])
+    otp_code = serializers.CharField(max_length=6)
+
+    class Meta:
+        fields = ['otp_type', 'otp_code']
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, validators=[validate_password])
+
+    class Meta:
+        fields = ['old_password', 'new_password']

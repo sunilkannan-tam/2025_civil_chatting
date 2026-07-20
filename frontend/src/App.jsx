@@ -525,7 +525,10 @@ function ChatDashboard({ user, token, handleLogout }) {
       <div className="sidebar">
         <div className="sidebar-header">
           <h2>💬 Chats</h2>
-          <button onClick={handleLogout} className="logout-btn">Logout</button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button onClick={() => navigate('/settings')} className="settings-icon-btn" title="Settings">⚙️</button>
+            <button onClick={handleLogout} className="logout-btn">Logout</button>
+          </div>
         </div>
 
         {pendingRequests.length > 0 && (
@@ -762,6 +765,290 @@ function ChatDashboard({ user, token, handleLogout }) {
   )
 }
 
+function Settings({ user, token }) {
+  const navigate = useNavigate()
+  const [username, setUsername] = useState(user?.username || '')
+  const [email, setEmail] = useState(user?.email || '')
+  const [phoneNumber, setPhoneNumber] = useState(user?.profile?.phone_number || '')
+  const [profilePic, setProfilePic] = useState(null)
+  const [profilePicPreview, setProfilePicPreview] = useState(
+    user?.profile?.profile_picture?.startsWith('http')
+      ? user.profile.profile_picture
+      : user?.profile?.profile_picture ? `${MEDIA_URL}${user.profile.profile_picture}` : null
+  )
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState({ type: '', text: '' })
+
+  // Password change
+  const [oldPassword, setOldPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [changingPassword, setChangingPassword] = useState(false)
+
+  // OTP
+  const [otpType, setOtpType] = useState('email')
+  const [otpValue, setOtpValue] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
+  const [otpCode, setOtpCode] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const [sendingOtp, setSendingOtp] = useState(false)
+
+  const showMsg = (type, text) => {
+    setMessage({ type, text })
+    setTimeout(() => setMessage({ type: '', text: '' }), 4000)
+  }
+
+  const handleProfilePicChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setProfilePic(file)
+      const reader = new FileReader()
+      reader.onload = (ev) => setProfilePicPreview(ev.target.result)
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      const formData = new FormData()
+      if (profilePic) formData.append('profile_picture', profilePic)
+      if (phoneNumber !== (user?.profile?.phone_number || '')) formData.append('phone_number', phoneNumber)
+
+      const res = await fetch(`${API_URL}/profile/update/`, {
+        method: 'PATCH',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: formData
+      })
+
+      if (res.ok) {
+        showMsg('success', 'Profile updated!')
+        // Update username/email via user endpoint
+        if (username !== user.username || email !== (user.email || '')) {
+          // Update user via admin-like endpoint or direct - skip for now since we don't have a User update endpoint
+          showMsg('info', 'Username/email change not available yet')
+        }
+      } else {
+        const err = await res.json()
+        showMsg('error', Object.values(err).flat().join(', '))
+      }
+    } catch (err) {
+      showMsg('error', 'Failed to update profile')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleChangePassword = async (e) => {
+    e.preventDefault()
+    setChangingPassword(true)
+    try {
+      const res = await fetch(`${API_URL}/change-password/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+      })
+      if (res.ok) {
+        showMsg('success', 'Password changed successfully!')
+        setOldPassword('')
+        setNewPassword('')
+      } else {
+        const err = await res.json()
+        showMsg('error', Object.values(err).flat().join(', '))
+      }
+    } catch (err) {
+      showMsg('error', 'Failed to change password')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
+  const handleSendOtp = async () => {
+    setSendingOtp(true)
+    try {
+      const val = otpType === 'email' ? (otpValue || email) : (otpValue || phoneNumber)
+      if (!val) {
+        showMsg('error', `Please enter your ${otpType} address`)
+        return
+      }
+      const res = await fetch(`${API_URL}/profile/send-otp/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ otp_type: otpType, value: val })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setOtpSent(true)
+        showMsg('success', `OTP sent! (Dev: ${data.otp_code})`)
+      } else {
+        const err = await res.json()
+        showMsg('error', Object.values(err).flat().join(', '))
+      }
+    } catch (err) {
+      showMsg('error', 'Failed to send OTP')
+    } finally {
+      setSendingOtp(false)
+    }
+  }
+
+  const handleVerifyOtp = async () => {
+    setVerifying(true)
+    try {
+      const res = await fetch(`${API_URL}/profile/verify-otp/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ otp_type: otpType, otp_code: otpCode })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        showMsg('success', `${otpType === 'email' ? 'Email' : 'Phone'} verified!`)
+        setOtpSent(false)
+        setOtpCode('')
+        setOtpValue('')
+      } else {
+        const err = await res.json()
+        showMsg('error', err.error || 'Invalid OTP')
+      }
+    } catch (err) {
+      showMsg('error', 'Failed to verify OTP')
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  return (
+    <div className="settings-page">
+      <div className="settings-header">
+        <button onClick={() => navigate('/')} className="settings-back-btn">← Back to Chat</button>
+        <h2>⚙️ Account Settings</h2>
+      </div>
+
+      {message.text && (
+        <div className={`settings-message settings-message-${message.type}`}>
+          {message.text}
+        </div>
+      )}
+
+      <div className="settings-content">
+        {/* Profile Photo */}
+        <div className="settings-section">
+          <h3>Profile Photo</h3>
+          <div className="profile-photo-section">
+            {profilePicPreview ? (
+              <img src={profilePicPreview} alt="Profile" className="profile-photo-preview" />
+            ) : (
+              <div className="profile-photo-placeholder">
+                {(user?.username?.[0] || '?').toUpperCase()}
+              </div>
+            )}
+            <label className="photo-upload-btn">
+              📷 Change Photo
+              <input type="file" accept="image/*" onChange={handleProfilePicChange} hidden />
+            </label>
+          </div>
+        </div>
+
+        {/* Account Info */}
+        <form onSubmit={handleSaveProfile} className="settings-section">
+          <h3>Account Info</h3>
+          <div className="settings-field">
+            <label>Username</label>
+            <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} />
+          </div>
+          <div className="settings-field">
+            <label>Email</label>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="settings-field">
+            <label>Phone Number</label>
+            <input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+1234567890" />
+          </div>
+          <button type="submit" disabled={saving} className="settings-save-btn">
+            {saving ? <span className="spinner"></span> : '💾 Save Profile'}
+          </button>
+        </form>
+
+        {/* OTP Verification */}
+        <div className="settings-section">
+          <h3>Verification</h3>
+          <div className="otp-type-selector">
+            <button
+              type="button"
+              className={`otp-type-btn ${otpType === 'email' ? 'active' : ''}`}
+              onClick={() => { setOtpType('email'); setOtpSent(false); setOtpCode(''); }}
+            >
+              📧 Email
+              {user?.profile?.email_verified && <span className="verified-badge">✓</span>}
+            </button>
+            <button
+              type="button"
+              className={`otp-type-btn ${otpType === 'phone' ? 'active' : ''}`}
+              onClick={() => { setOtpType('phone'); setOtpSent(false); setOtpCode(''); }}
+            >
+              📱 Phone
+              {user?.profile?.phone_verified && <span className="verified-badge">✓</span>}
+            </button>
+          </div>
+
+          {!otpSent ? (
+            <div className="otp-send-section">
+              <div className="settings-field">
+                <label>Enter {otpType === 'email' ? 'Email' : 'Phone'}</label>
+                <input
+                  type={otpType === 'email' ? 'email' : 'tel'}
+                  value={otpValue}
+                  onChange={(e) => setOtpValue(e.target.value)}
+                  placeholder={otpType === 'email' ? 'your@email.com' : '+1234567890'}
+                />
+              </div>
+              <button onClick={handleSendOtp} disabled={sendingOtp || !otpValue.trim()} className="otp-send-btn">
+                {sendingOtp ? <span className="spinner"></span> : '📤 Send OTP'}
+              </button>
+            </div>
+          ) : (
+            <div className="otp-verify-section">
+              <div className="settings-field">
+                <label>Enter OTP Code</label>
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  placeholder="000000"
+                />
+              </div>
+              <div className="otp-actions">
+                <button onClick={handleVerifyOtp} disabled={verifying || otpCode.length < 6} className="otp-verify-btn">
+                  {verifying ? <span className="spinner"></span> : '✅ Verify'}
+                </button>
+                <button onClick={() => { setOtpSent(false); setOtpCode(''); }} className="otp-cancel-btn">
+                  ✕ Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Change Password */}
+        <form onSubmit={handleChangePassword} className="settings-section">
+          <h3>Change Password</h3>
+          <div className="settings-field">
+            <label>Current Password</label>
+            <input type="password" value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} required />
+          </div>
+          <div className="settings-field">
+            <label>New Password</label>
+            <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={8} />
+          </div>
+          <button type="submit" disabled={changingPassword || !oldPassword || !newPassword} className="settings-save-btn">
+            {changingPassword ? <span className="spinner"></span> : '🔑 Change Password'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function App() {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(localStorage.getItem('token'))
@@ -826,6 +1113,16 @@ function App() {
         element={
           token && user ? (
             <ChatDashboard user={user} token={token} handleLogout={handleLogout} />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          token && user ? (
+            <Settings user={user} token={token} />
           ) : (
             <Navigate to="/login" replace />
           )

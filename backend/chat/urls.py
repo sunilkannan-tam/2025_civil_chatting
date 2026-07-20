@@ -14,4 +14,9 @@ urlpatterns = [
     path('chats/', views.ChatListView.as_view(), name='chat-list'),
     path('chats/<int:chat_id>/messages/',
          views.MessageListView.as_view(), name='message-list'),
+    # Profile & OTP routes
+    path('profile/update/', views.ProfileUpdateView.as_view(), name='profile-update'),
+    path('profile/send-otp/', views.OTPSendView.as_view(), name='send-otp'),
+    path('profile/verify-otp/', views.OTPVerifyView.as_view(), name='verify-otp'),
+    path('change-password/', views.ChangePasswordView.as_view(), name='change-password'),
 ]
