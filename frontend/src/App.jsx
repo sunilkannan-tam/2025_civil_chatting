@@ -224,6 +224,7 @@ function getFileIcon(fileType, fileName) {
 }
 
 function ChatDashboard({ user, token, handleLogout }) {
+  const navigate = useNavigate()
   const [chats, setChats] = useState([])
   const [users, setUsers] = useState([])
   const [friendRequests, setFriendRequests] = useState([])
