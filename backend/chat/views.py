@@ -19,6 +19,8 @@ from .serializers import (
 from .utils import send_email_otp, send_sms_otp
 from rest_framework.permissions import IsAuthenticated
 
+from_email_env = __import__('os').getenv('FROM_EMAIL', '')
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,14 +42,21 @@ class RegisterView(generics.CreateAPIView):
             otp_type='email'
         )
 
-        print(f"Registration OTP for {user.username}: {otp_code}")
+        # Send OTP to user's email
+        sent = send_email_otp(user.email, otp_code, username=user.username)
+        if sent:
+            logger.info(f"Registration OTP email sent to {user.email}")
+            otp_to_return = None
+        else:
+            logger.info(f"Registration OTP for {user.username}: {otp_code}")
+            otp_to_return = otp_code
 
         return Response({
             'user_id': user.id,
             'username': user.username,
             'email': user.email,
             'message': 'Account created! Please verify your email.',
-            'otp_code': otp_code,  # Remove in production!
+            'otp_code': otp_to_return,  # Only returned in dev mode if email sending failed
         }, status=status.HTTP_201_CREATED)
 
 
