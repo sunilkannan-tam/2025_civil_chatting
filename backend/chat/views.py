@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from django.db.models import Q
 from .models import Chat, Message, FriendRequest, UserProfile, OTP, Call, CallHistory
 from .serializers import (
@@ -504,6 +505,125 @@ class CallHistoryListView(generics.ListAPIView):
         return CallHistory.objects.filter(
             Q(call__caller=user) | Q(call__receiver=user)
         ).select_related('call', 'call__caller', 'call__receiver').order_by('-timestamp')
+
+
+class ForgotPasswordView(APIView):
+    """
+    Send OTP to user's email for password reset.
+    No authentication required.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'User with this email not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Generate OTP for password reset
+        otp_code = str(random.randint(100000, 999999))
+        OTP.objects.create(
+            user=user,
+            otp_code=otp_code,
+            otp_type='email'
+        )
+
+        # Send OTP via email
+        sent = send_email_otp(user.email, otp_code, username=user.username)
+        if sent:
+            logger.info(f"Password reset OTP sent to {user.email}")
+            return Response({'message': 'OTP sent to your email'})
+        else:
+            logger.info(f"Password reset OTP for {user.username}: {otp_code}")
+            return Response({
+                'message': 'OTP sent to your email',
+                'otp_code': otp_code  # Only returned in dev mode if email sending failed
+            })
+
+
+class ResetPasswordView(APIView):
+    """
+    Verify OTP and reset password.
+    No authentication required.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        otp_code = request.data.get('otp_code')
+        new_password = request.data.get('new_password')
+
+        if not email or not otp_code or not new_password:
+            return Response({
+                'error': 'Email, OTP code, and new password are required'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Find matching OTP
+        time_threshold = timezone.now() - timezone.timedelta(minutes=10)
+        otp_obj = OTP.objects.filter(
+            user=user,
+            otp_type='email',
+            otp_code=otp_code,
+            is_used=False,
+            created_at__gte=time_threshold
+        ).last()
+
+        if not otp_obj:
+            return Response({'error': 'Invalid or expired OTP'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate password
+        try:
+            validate_password(new_password)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Mark OTP as used
+        otp_obj.is_used = True
+        otp_obj.save()
+
+        # Reset password
+        user.set_password(new_password)
+        user.save()
+
+        return Response({'message': 'Password reset successfully! You can now log in.'})
+
+
+class MessageDeleteView(APIView):
+    """
+    Delete a message for sender (unsend) or receiver.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            message = Message.objects.get(id=pk)
+        except Message.DoesNotExist:
+            return Response({'error': 'Message not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Check if user is part of the chat
+        if message.chat.user1 != request.user and message.chat.user2 != request.user:
+            return Response({'error': 'You do not have access to this message'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Determine if user is sender or receiver
+        if message.sender == request.user:
+            # Sender unsend - hide from both users
+            message.deleted_by_sender = True
+            message.deleted_by_receiver = True  # Hide from receiver too
+        else:
+            # Receiver delete - hide for receiver only
+            message.deleted_by_receiver = True
+
+        message.save()
+        return Response({'message': 'Message deleted successfully'})
 
 
 class AdminCallHistoryListView(APIView):

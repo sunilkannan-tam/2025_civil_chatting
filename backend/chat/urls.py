@@ -30,4 +30,11 @@ urlpatterns = [
     path('calls/<int:call_id>/update/', views.UpdateCallStatusView.as_view(), name='update-call-status'),
     path('calls/history/', views.CallHistoryListView.as_view(), name='call-history'),
     path('admin/calls/history/', views.AdminCallHistoryListView.as_view(), name='admin-call-history'),
+
+    # Forgot password routes
+    path('forgot-password/', views.ForgotPasswordView.as_view(), name='forgot-password'),
+    path('reset-password/', views.ResetPasswordView.as_view(), name='reset-password'),
+
+    # Message delete route
+    path('messages/<int:pk>/delete/', views.MessageDeleteView.as_view(), name='delete-message'),
 ]

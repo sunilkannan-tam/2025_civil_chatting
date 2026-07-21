@@ -54,8 +54,8 @@ class MessageSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Message
-        fields = ['id', 'chat', 'sender', 'text', 'file', 'file_type', 'file_name', 'file_size', 'timestamp', 'is_read', 'read_at']
-        read_only_fields = ['chat', 'sender', 'timestamp', 'file_type', 'file_name', 'file_size']
+        fields = ['id', 'chat', 'sender', 'text', 'file', 'file_type', 'file_name', 'file_size', 'timestamp', 'is_read', 'read_at', 'deleted_by_sender', 'deleted_by_receiver']
+        read_only_fields = ['chat', 'sender', 'timestamp', 'file_type', 'file_name', 'file_size', 'deleted_by_sender', 'deleted_by_receiver']
 
     def create(self, validated_data):
         request = self.context.get('request')

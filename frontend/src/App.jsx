@@ -178,6 +178,11 @@ function Login({ setUser, setToken }) {
         </button>
       </form>
       <p className="auth-switch">Don't have an account? <a href="/register" onClick={(e) => { e.preventDefault(); navigate('/register') }}>Register</a></p>
+      <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem' }}>
+        <a href="/forgot-password" onClick={(e) => { e.preventDefault(); navigate('/forgot-password') }} style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+          Forgot Password?
+        </a>
+      </p>
     </div>
   )
 }
@@ -250,6 +255,199 @@ function Register({ setUser, setToken }) {
   )
 }
 
+function ForgotPassword({ setToken }) {
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const navigate = useNavigate()
+
+  const handleSendOtp = async (e) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/forgot-password/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setOtpSent(true)
+        // Navigate to reset password page
+        navigate('/reset-password', {
+          state: { email, otpCode: data.otp_code }
+        })
+      } else {
+        const errData = await res.json()
+        setError(errData.error || 'Failed to send OTP')
+      }
+    } catch (err) {
+      setError('Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="auth-container">
+      <div className="auth-bg-shapes">
+        <div className="shape shape-1"></div>
+        <div className="shape shape-2"></div>
+        <div className="shape shape-3"></div>
+      </div>
+      <h1><span className="logo-icon">🔑</span> Forgot Password</h1>
+      <form onSubmit={handleSendOtp} className="auth-form">
+        <div className="input-group">
+          <span className="input-icon">📧</span>
+          <input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </div>
+        {error && <p className="error">{error}</p>}
+        <button type="submit" disabled={loading} className="auth-btn">
+          {loading ? <span className="spinner"></span> : 'Send Reset Code'}
+        </button>
+      </form>
+      <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem' }}>
+        <a href="/login" onClick={(e) => { e.preventDefault(); navigate('/login') }} style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+          ← Back to Login
+        </a>
+      </p>
+    </div>
+  )
+}
+
+function ResetPassword({ setToken }) {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { email, otpCode } = location.state || {}
+
+  const [otp, setOtp] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  // Redirect if no email state
+  useEffect(() => {
+    if (!email) {
+      navigate('/forgot-password', { replace: true })
+    }
+  }, [email, navigate])
+
+  const handleReset = async (e) => {
+    e.preventDefault()
+    setError('')
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/reset-password/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp_code: otp, new_password: newPassword })
+      })
+      if (res.ok) {
+        setSuccess('Password reset successfully! Redirecting to login...')
+        setTimeout(() => navigate('/login'), 2000)
+      } else {
+        const errData = await res.json()
+        setError(errData.error || 'Failed to reset password')
+      }
+    } catch (err) {
+      setError('Something went wrong')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (!email) return null
+
+  return (
+    <div className="auth-container">
+      <div className="auth-bg-shapes">
+        <div className="shape shape-1"></div>
+        <div className="shape shape-2"></div>
+        <div className="shape shape-3"></div>
+      </div>
+      <h1><span className="logo-icon">🔐</span> Reset Password</h1>
+
+      <form onSubmit={handleReset} className="auth-form">
+        <p style={{ textAlign: 'center', color: '#718096', marginBottom: '1rem', fontSize: '0.95rem' }}>
+          Enter the OTP sent to <strong>{email}</strong>
+        </p>
+
+        {otpCode && (
+          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#10b981', marginBottom: '1rem', padding: '0.5rem', background: '#f0fdf4', borderRadius: '8px' }}>
+            ⚡ Dev Mode: Your OTP is <strong>{otpCode}</strong>
+          </p>
+        )}
+
+        <div className="input-group">
+          <span className="input-icon">🔑</span>
+          <input
+            type="text"
+            maxLength={6}
+            placeholder="Enter 6-digit OTP"
+            value={otp}
+            onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            required
+          />
+        </div>
+
+        <div className="input-group">
+          <span className="input-icon">🔒</span>
+          <input
+            type="password"
+            placeholder="New password (min 8 chars)"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+            minLength={8}
+          />
+        </div>
+
+        <div className="input-group">
+          <span className="input-icon">🔒</span>
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+          />
+        </div>
+
+        {error && <p className="error">{error}</p>}
+        {success && <p className="success">{success}</p>}
+
+        <button type="submit" disabled={loading || otp.length < 6 || !newPassword} className="auth-btn">
+          {loading ? <span className="spinner"></span> : 'Reset Password'}
+        </button>
+
+        <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem' }}>
+          <a href="/login" onClick={(e) => { e.preventDefault(); navigate('/login') }} style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>
+            ← Back to Login
+          </a>
+        </p>
+      </form>
+    </div>
+  )
+}
+
 function formatLastActive(dateString) {
   if (!dateString) return 'Offline'
   const date = new Date(dateString)
@@ -297,6 +495,7 @@ function ChatDashboard({ user, token, handleLogout }) {
   const [showAddFriend, setShowAddFriend] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showCallModal, setShowCallModal] = useState(null)
+  const [showMessageMenu, setShowMessageMenu] = useState(null)
   const chatWsRef = useRef(null)
   const presenceWsRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -523,6 +722,24 @@ function ChatDashboard({ user, token, handleLogout }) {
     setShowEmojiPicker(false)
   }
 
+  const deleteMessage = async (messageId) => {
+    try {
+      const res = await fetch(`${API_URL}/messages/${messageId}/delete/`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        setMessages(prev => prev.filter(msg => msg.id !== messageId))
+        showNotification('Message deleted', 'success')
+      } else {
+        showNotification('Failed to delete message', 'error')
+      }
+    } catch (err) {
+      showNotification('Failed to delete message', 'error')
+    }
+    setShowMessageMenu(null)
+  }
+
   const renderMessageContent = (msg) => {
     if (msg.file) {
       const fileUrl = msg.file.startsWith('http') ? msg.file : `${MEDIA_URL}${msg.file}`
@@ -746,17 +963,50 @@ function ChatDashboard({ user, token, handleLogout }) {
                   No messages yet. Say hello! 👋
                 </div>
               ) : (
-                messages.map(msg => (
-                  <div key={msg.id} className={`message ${msg.sender.id === user.id ? 'own' : ''}`}>
-                    {renderMessageContent(msg)}
-                    <div className="message-time">
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      {msg.sender.id === user.id && (
-                        <span className="message-status">{msg.is_read ? '✓✓' : '✓'}</span>
+                messages
+                  .filter(msg => !msg.deleted_by_sender && !msg.deleted_by_receiver)
+                  .map(msg => (
+                    <div
+                      key={msg.id}
+                      className={`message ${msg.sender.id === user.id ? 'own' : ''}`}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        if (msg.sender.id === user.id || msg.deleted_by_receiver === false) {
+                          setShowMessageMenu(msg.id)
+                        }
+                      }}
+                      onMouseLeave={() => setShowMessageMenu(null)}
+                    >
+                      {renderMessageContent(msg)}
+                      <div className="message-time">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {msg.sender.id === user.id && (
+                          <span className="message-status">{msg.is_read ? '✓✓' : '✓'}</span>
+                        )}
+                      </div>
+                      {showMessageMenu === msg.id && (
+                        <div className="message-menu">
+                          {msg.sender.id === user.id ? (
+                            <button
+                              onClick={() => deleteMessage(msg.id)}
+                              className="message-menu-btn unsend-btn"
+                              title="Unsend (Delete for everyone)"
+                            >
+                              🗑️ Unsend
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => deleteMessage(msg.id)}
+                              className="message-menu-btn delete-btn"
+                              title="Delete for me"
+                            >
+                              ✕ Delete
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
-                  </div>
-                ))
+                  ))
               )}
               <div ref={messagesEndRef} />
             </div>
@@ -2008,6 +2258,14 @@ function App() {
       <Route
         path="/verify-email"
         element={<EmailVerification />}
+      />
+      <Route
+        path="/forgot-password"
+        element={<ForgotPassword setToken={setToken} />}
+      />
+      <Route
+        path="/reset-password"
+        element={<ResetPassword setToken={setToken} />}
       />
       <Route
         path="/settings"
