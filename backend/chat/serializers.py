@@ -9,7 +9,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = UserProfile
-        fields = ['profile_picture', 'is_online', 'last_active', 'phone_number', 'email_verified', 'phone_verified']
+        fields = ['profile_picture', 'is_online', 'last_active', 'phone_number', 'country_code', 'email_verified', 'phone_verified']
 
     def get_profile_picture(self, obj):
         try:
@@ -125,11 +125,12 @@ class RegisterSerializer(serializers.ModelSerializer):
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserProfile
-        fields = ['profile_picture', 'phone_number']
+        fields = ['profile_picture', 'phone_number', 'country_code']
 
     def update(self, instance, validated_data):
         instance.profile_picture = validated_data.get('profile_picture', instance.profile_picture)
         instance.phone_number = validated_data.get('phone_number', instance.phone_number)
+        instance.country_code = validated_data.get('country_code', instance.country_code)
         instance.save()
         return instance
 
@@ -137,6 +138,7 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 class OTPSendSerializer(serializers.Serializer):
     otp_type = serializers.ChoiceField(choices=['email', 'phone'])
     value = serializers.CharField()
+    country_code = serializers.CharField(required=False, default='+91')
 
     class Meta:
         fields = ['otp_type', 'value']

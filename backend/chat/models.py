@@ -6,6 +6,7 @@ class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     profile_picture = models.ImageField(upload_to='profile_pics/', null=True, blank=True)
     phone_number = models.CharField(max_length=20, null=True, blank=True)
+    country_code = models.CharField(max_length=5, default='+91', help_text='Country code e.g. +91, +1')
     email_verified = models.BooleanField(default=False)
     phone_verified = models.BooleanField(default=False)
     is_online = models.BooleanField(default=False)

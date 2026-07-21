@@ -1224,3 +1224,82 @@ body {
     width: 100%;
   }
 }
+
+/* Phone Input with Country Code */
+.phone-input-wrapper {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+
+.country-code-btn {
+  padding: 0.85rem 1rem;
+  background: var(--bg-white);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-dark);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  min-width: 100px;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.country-code-btn:hover {
+  border-color: #667eea;
+}
+
+.country-code-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--bg-white);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  max-height: 250px;
+  overflow-y: auto;
+  z-index: 100;
+  min-width: 200px;
+}
+
+.country-code-option {
+  display: block;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-align: left;
+  color: var(--text-dark);
+  transition: all 0.15s ease;
+}
+
+.country-code-option:hover {
+  background: #f0f4ff;
+}
+
+.country-code-option.active {
+  background: #e0e7ff;
+  font-weight: 700;
+  color: #667eea;
+}
+
+.country-code-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.country-code-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.country-code-dropdown::-webkit-scrollbar-thumb {
+  background: #cbd5e0;
+  border-radius: 3px;
+}

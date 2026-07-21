@@ -1,4 +1,5 @@
 import random
+import logging
 from django.utils import timezone
 from django.contrib.auth import authenticate
 from rest_framework import generics, permissions, status
@@ -15,7 +16,10 @@ from .serializers import (
     ProfileUpdateSerializer, OTPSendSerializer,
     OTPVerifySerializer, ChangePasswordSerializer
 )
+from .utils import send_email_otp, send_sms_otp
 from rest_framework.permissions import IsAuthenticated
+
+logger = logging.getLogger(__name__)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -257,6 +261,7 @@ class OTPSendView(APIView):
 
         otp_type = serializer.validated_data['otp_type']
         value = serializer.validated_data['value']
+        country_code = serializer.validated_data.get('country_code', '+91')
 
         # Generate a 6-digit OTP
         otp_code = str(random.randint(100000, 999999))
@@ -268,14 +273,24 @@ class OTPSendView(APIView):
             otp_type=otp_type
         )
 
-        # In production, send via email/SMS here
-        # For now, return OTP in response (dev mode)
-        print(f"OTP for {request.user.username} ({otp_type}): {otp_code}")
+        # Try to send OTP via real channel
+        sent = False
+        if otp_type == 'email':
+            sent = send_email_otp(value, otp_code, username=request.user.username)
+        elif otp_type == 'phone':
+            sent = send_sms_otp(value, otp_code, country_code=country_code)
+
+        # Log for debugging
+        if sent:
+            logger.info(f"OTP sent successfully to {request.user.username} via {otp_type}")
+        else:
+            logger.info(f"OTP for {request.user.username} ({otp_type}): {otp_code}")
 
         return Response({
             'message': f'OTP sent to your {otp_type}',
-            'otp_code': otp_code,  # Remove in production!
-            'otp_type': otp_type
+            'otp_code': otp_code if not sent else None,  # Only return in dev mode if sending failed
+            'otp_type': otp_type,
+            'sent_via': otp_type if sent else 'console'
         })
 
 

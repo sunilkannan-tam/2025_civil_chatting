@@ -59,6 +59,66 @@ function Avatar({ user, size = 40, className = '' }) {
 
 const EMOJIS = ['😀','😂','❤️','🔥','👍','🎉','😍','✨','💯','🙏','🥺','🤣','💪','😎','🌟','🤩','😊','💕','🤗','😅','💀','☀️','🌈','⭐','🍕','🎶','⚡','🌸','😜','🤔']
 
+const COUNTRY_CODES = [
+  { code: '+1', name: '🇺🇸 US/CA' },
+  { code: '+44', name: '🇬🇧 UK' },
+  { code: '+91', name: '🇮🇳 India' },
+  { code: '+61', name: '🇦🇺 Australia' },
+  { code: '+81', name: '🇯🇵 Japan' },
+  { code: '+86', name: '🇨🇳 China' },
+  { code: '+49', name: '🇩🇪 Germany' },
+  { code: '+33', name: '🇫🇷 France' },
+  { code: '+39', name: '🇮🇹 Italy' },
+  { code: '+55', name: '🇧🇷 Brazil' },
+  { code: '+7', name: '🇷🇺 Russia' },
+  { code: '+82', name: '🇰🇷 S. Korea' },
+  { code: '+34', name: '🇪🇸 Spain' },
+  { code: '+31', name: '🇳🇱 Netherlands' },
+  { code: '+46', name: '🇸🇪 Sweden' },
+  { code: '+41', name: '🇨🇭 Switzerland' },
+  { code: '+971', name: '🇦🇪 UAE' },
+  { code: '+966', name: '🇸🇦 Saudi' },
+  { code: '+65', name: '🇸🇬 Singapore' },
+  { code: '+60', name: '🇲🇾 Malaysia' },
+  { code: '+63', name: '🇵🇭 Philippines' },
+  { code: '+62', name: '🇮🇩 Indonesia' },
+  { code: '+64', name: '🇳🇿 New Zealand' },
+  { code: '+27', name: '🇿🇦 S. Africa' },
+  { code: '+234', name: '🇳🇬 Nigeria' },
+  { code: '+254', name: '🇰🇪 Kenya' },
+  { code: '+20', name: '🇪🇬 Egypt' },
+  { code: '+92', name: '🇵🇰 Pakistan' },
+  { code: '+880', name: '🇧🇩 Bangladesh' },
+  { code: '+94', name: '🇱🇰 Sri Lanka' },
+  { code: '+977', name: '🇳🇵 Nepal' },
+  { code: '+98', name: '🇮🇷 Iran' },
+  { code: '+90', name: '🇹🇷 Turkey' },
+  { code: '+84', name: '🇻🇳 Vietnam' },
+  { code: '+66', name: '🇹🇭 Thailand' },
+  { code: '+852', name: '🇭🇰 Hong Kong' },
+  { code: '+886', name: '🇹🇼 Taiwan' },
+  { code: '+351', name: '🇵🇹 Portugal' },
+  { code: '+48', name: '🇵🇱 Poland' },
+  { code: '+36', name: '🇭🇺 Hungary' },
+  { code: '+420', name: '🇨🇿 Czech' },
+  { code: '+45', name: '🇩🇰 Denmark' },
+  { code: '+47', name: '🇳🇴 Norway' },
+  { code: '+358', name: '🇫🇮 Finland' },
+  { code: '+353', name: '🇮🇪 Ireland' },
+  { code: '+43', name: '🇦🇹 Austria' },
+  { code: '+32', name: '🇧🇪 Belgium' },
+  { code: '+30', name: '🇬🇷 Greece' },
+  { code: '+54', name: '🇦🇷 Argentina' },
+  { code: '+56', name: '🇨🇱 Chile' },
+  { code: '+57', name: '🇨🇴 Colombia' },
+  { code: '+52', name: '🇲🇽 Mexico' },
+  { code: '+51', name: '🇵🇪 Peru' },
+  { code: '+58', name: '🇻🇪 Venezuela' },
+  { code: '+212', name: '🇲🇦 Morocco' },
+  { code: '+213', name: '🇩🇿 Algeria' },
+  { code: '+216', name: '🇹🇳 Tunisia' },
+]
+
 function Login({ setUser, setToken }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -1050,6 +1110,7 @@ function Settings({ user, token }) {
   const [username, setUsername] = useState(user?.username || '')
   const [email, setEmail] = useState(user?.email || '')
   const [phoneNumber, setPhoneNumber] = useState(user?.profile?.phone_number || '')
+  const [countryCode, setCountryCode] = useState(user?.profile?.country_code || '+91')
   const [profilePic, setProfilePic] = useState(null)
   const [profilePicPreview, setProfilePicPreview] = useState(
     user?.profile?.profile_picture?.startsWith('http')
@@ -1071,6 +1132,7 @@ function Settings({ user, token }) {
   const [otpCode, setOtpCode] = useState('')
   const [verifying, setVerifying] = useState(false)
   const [sendingOtp, setSendingOtp] = useState(false)
+  const [showCountryDropdown, setShowCountryDropdown] = useState(false)
 
   const showMsg = (type, text) => {
     setMessage({ type, text })
@@ -1094,6 +1156,7 @@ function Settings({ user, token }) {
       const formData = new FormData()
       if (profilePic) formData.append('profile_picture', profilePic)
       if (phoneNumber !== (user?.profile?.phone_number || '')) formData.append('phone_number', phoneNumber)
+      if (countryCode !== (user?.profile?.country_code || '+91')) formData.append('country_code', countryCode)
 
       const res = await fetch(`${API_URL}/profile/update/`, {
         method: 'PATCH',
@@ -1151,10 +1214,14 @@ function Settings({ user, token }) {
         showMsg('error', `Please enter your ${otpType} address`)
         return
       }
+      const payload = { otp_type: otpType, value: val }
+      if (otpType === 'phone') {
+        payload.country_code = countryCode
+      }
       const res = await fetch(`${API_URL}/profile/send-otp/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        body: JSON.stringify({ otp_type: otpType, value: val })
+        body: JSON.stringify(payload)
       })
       if (res.ok) {
         const data = await res.json()
@@ -1241,7 +1308,38 @@ function Settings({ user, token }) {
           </div>
           <div className="settings-field">
             <label>Phone Number</label>
-            <input type="tel" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} placeholder="+1234567890" />
+            <div className="phone-input-wrapper">
+              <div className="country-code-selector" style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowCountryDropdown(!showCountryDropdown)}
+                  className="country-code-btn"
+                >
+                  {countryCode} ▾
+                </button>
+                {showCountryDropdown && (
+                  <div className="country-code-dropdown">
+                    {COUNTRY_CODES.map(c => (
+                      <button
+                        key={c.code}
+                        type="button"
+                        className={`country-code-option ${c.code === countryCode ? 'active' : ''}`}
+                        onClick={() => { setCountryCode(c.code); setShowCountryDropdown(false); }}
+                      >
+                        {c.name} {c.code}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <input
+                type="tel"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="1234567890"
+                style={{ flex: 1 }}
+              />
+            </div>
           </div>
           <button type="submit" disabled={saving} className="settings-save-btn">
             {saving ? <span className="spinner"></span> : '💾 Save Profile'}
