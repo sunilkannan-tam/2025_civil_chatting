@@ -24,4 +24,10 @@ urlpatterns = [
     # Admin routes
     path('admin/users/', views.AdminUserListView.as_view(), name='admin-user-list'),
     path('admin/users/<int:pk>/delete/', views.AdminDeleteUserView.as_view(), name='admin-delete-user'),
+
+    # Call routes
+    path('calls/initiate/', views.InitiateCallView.as_view(), name='initiate-call'),
+    path('calls/<int:call_id>/update/', views.UpdateCallStatusView.as_view(), name='update-call-status'),
+    path('calls/history/', views.CallHistoryListView.as_view(), name='call-history'),
+    path('admin/calls/history/', views.AdminCallHistoryListView.as_view(), name='admin-call-history'),
 ]

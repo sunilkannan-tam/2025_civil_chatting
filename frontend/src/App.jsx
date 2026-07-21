@@ -296,6 +296,7 @@ function ChatDashboard({ user, token, handleLogout }) {
   const [uploadingFile, setUploadingFile] = useState(false)
   const [showAddFriend, setShowAddFriend] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [showCallModal, setShowCallModal] = useState(null)
   const chatWsRef = useRef(null)
   const presenceWsRef = useRef(null)
   const messagesEndRef = useRef(null)
@@ -712,6 +713,31 @@ function ChatDashboard({ user, token, handleLogout }) {
                   </div>
                 </div>
               </div>
+              <div className="chat-header-actions">
+                <button
+                  onClick={() => navigate('/call-history')}
+                  className="header-action-btn"
+                  title="Call History"
+                >
+                  📞
+                </button>
+                <button
+                  onClick={() => setShowCallModal({ type: 'audio', chat: selectedChat })}
+                  className="header-action-btn"
+                  title="Audio Call"
+                  disabled={!selectedChat.other_user.profile?.is_online}
+                >
+                  📞
+                </button>
+                <button
+                  onClick={() => setShowCallModal({ type: 'video', chat: selectedChat })}
+                  className="header-action-btn"
+                  title="Video Call"
+                  disabled={!selectedChat.other_user.profile?.is_online}
+                >
+                  📹
+                </button>
+              </div>
             </div>
 
             <div className="messages">
@@ -824,6 +850,16 @@ function ChatDashboard({ user, token, handleLogout }) {
                   </button>
                 ))}
               </div>
+            )}
+
+            {showCallModal && (
+              <CallModal
+                user={user}
+                token={token}
+                selectedChat={showCallModal.chat}
+                onClose={() => setShowCallModal(null)}
+                presenceWsRef={presenceWsRef}
+              />
             )}
           </>
         )}
@@ -1098,6 +1134,479 @@ function AdminPanel({ user, token }) {
                 <p style={{ textAlign: 'center', color: '#718096', padding: '2rem' }}>No users found.</p>
               )}
             </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CallHistoryPage({ user, token }) {
+  const navigate = useNavigate()
+  const [callHistory, setCallHistory] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [message, setMessage] = useState({ type: '', text: '' })
+
+  const showMsg = (type, text) => {
+    setMessage({ type, text })
+    setTimeout(() => setMessage({ type: '', text: '' }), 4000)
+  }
+
+  useEffect(() => {
+    fetchCallHistory()
+  }, [])
+
+  const fetchCallHistory = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/calls/history/`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        setCallHistory(await res.json())
+      } else {
+        const err = await res.json()
+        showMsg('error', err.error || 'Failed to load call history')
+      }
+    } catch (err) {
+      showMsg('error', 'Failed to load call history')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatDuration = (seconds) => {
+    if (!seconds) return '0:00'
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  const formatCallTime = (timestamp) => {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diffMs = now - date
+    const diffMinutes = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMinutes / 60)
+    const diffDays = Math.floor(diffHours / 24)
+
+    if (diffMinutes < 1) return 'Just now'
+    if (diffMinutes < 60) return `${diffMinutes}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString()
+  }
+
+  const getCallIcon = (callType, status) => {
+    if (status === 'missed') return '📵'
+    if (status === 'rejected') return '❌'
+    return callType === 'video' ? '📹' : '📞'
+  }
+
+  const getCallStatusText = (status) => {
+    switch (status) {
+      case 'initiated': return 'Initiated'
+      case 'ringing': return 'Ringing'
+      case 'accepted': return 'Accepted'
+      case 'rejected': return 'Rejected'
+      case 'missed': return 'Missed'
+      case 'ended': return 'Ended'
+      default: return status
+    }
+  }
+
+  // Group calls by call ID to show unique calls
+  const uniqueCalls = callHistory.reduce((acc, history) => {
+    const callId = history.call.id
+    if (!acc[callId]) {
+      acc[callId] = {
+        call: history.call,
+        histories: []
+      }
+    }
+    acc[callId].histories.push(history)
+    return acc
+  }, {})
+
+  const sortedCalls = Object.values(uniqueCalls).sort((a, b) => {
+    const timeA = new Date(a.histories[0]?.timestamp || a.call.started_at)
+    const timeB = new Date(b.histories[0]?.timestamp || b.call.started_at)
+    return timeB - timeA
+  })
+
+  return (
+    <div className="settings-page">
+      <div className="settings-header">
+        <button onClick={() => navigate('/')} className="settings-back-btn">← Back to Chat</button>
+        <h2>📞 Call History</h2>
+      </div>
+
+      {message.text && (
+        <div className={`settings-message settings-message-${message.type}`}>
+          {message.text}
+        </div>
+      )}
+
+      <div className="settings-content">
+        <div className="settings-section">
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: '2rem' }}>
+              <div className="loading-spinner"></div>
+              <p style={{ color: '#718096', marginTop: '0.5rem' }}>Loading call history...</p>
+            </div>
+          ) : sortedCalls.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: '#718096' }}>
+              <div style={{ fontSize: '3rem', marginBottom: '1rem' }}>📞</div>
+              <p>No call history yet</p>
+              <p style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>Start calling your friends to see your history here!</p>
+            </div>
+          ) : (
+            <div className="call-history-list">
+              {sortedCalls.map(({ call, histories }) => {
+                const otherUser = call.caller.id === user.id ? call.receiver : call.caller
+                const latestHistory = histories[0]
+                const isOutgoing = call.caller.id === user.id
+
+                return (
+                  <div key={call.id} className="call-history-item">
+                    <div className="call-history-avatar">
+                      {getCallIcon(call.call_type, call.status)}
+                    </div>
+                    <div className="call-history-details">
+                      <div className="call-history-user">
+                        {otherUser.username}
+                        {isOutgoing ? ' (Outgoing)' : ' (Incoming)'}
+                      </div>
+                      <div className="call-history-meta">
+                        <span className={`call-status-badge call-status-${call.status}`}>
+                          {getCallStatusText(call.status)}
+                        </span>
+                        <span className="call-type-badge">
+                          {call.call_type === 'video' ? '📹 Video' : '📞 Audio'}
+                        </span>
+                        {call.duration > 0 && (
+                          <span className="call-duration">⏱️ {formatDuration(call.duration)}</span>
+                        )}
+                      </div>
+                      <div className="call-history-time">
+                        {formatCallTime(latestHistory?.timestamp || call.started_at)}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function CallModal({ user, token, selectedChat, onClose, presenceWsRef }) {
+  const [callStatus, setCallStatus] = useState('initiating')
+  const [callId, setCallId] = useState(null)
+  const [callType] = useState(selectedChat?.call_type || 'audio')
+  const [duration, setDuration] = useState(0)
+  const [error, setError] = useState('')
+  const [localStream, setLocalStream] = useState(null)
+  const [remoteStream, setRemoteStream] = useState(null)
+  const [isMuted, setIsMuted] = useState(false)
+  const [isVideoOff, setIsVideoOff] = useState(false)
+  
+  const localVideoRef = useRef(null)
+  const remoteVideoRef = useRef(null)
+  const peerConnectionRef = useRef(null)
+  const durationIntervalRef = useRef(null)
+
+  const otherUser = selectedChat?.other_user
+
+  useEffect(() => {
+    initiateCall()
+    return () => {
+      cleanup()
+    }
+  }, [])
+
+  const cleanup = () => {
+    if (durationIntervalRef.current) {
+      clearInterval(durationIntervalRef.current)
+    }
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop())
+    }
+    if (peerConnectionRef.current) {
+      peerConnectionRef.current.close()
+    }
+  }
+
+  const initiateCall = async () => {
+    try {
+      // Initiate call via API
+      const res = await fetch(`${API_URL}/calls/initiate/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          receiver_id: otherUser.id,
+          call_type: callType
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setCallId(data.id)
+        setCallStatus('ringing')
+
+        // Start duration timer
+        durationIntervalRef.current = setInterval(() => {
+          setDuration(prev => prev + 1)
+        }, 1000)
+
+        // For video calls, get media stream
+        if (callType === 'video') {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: true,
+              audio: true
+            })
+            setLocalStream(stream)
+            if (localVideoRef.current) {
+              localVideoRef.current.srcObject = stream
+            }
+          } catch (err) {
+            console.error('Failed to get media devices:', err)
+            setError('Failed to access camera/microphone')
+          }
+        } else {
+          // For audio calls, just get audio
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: true
+            })
+            setLocalStream(stream)
+          } catch (err) {
+            console.error('Failed to get audio:', err)
+            setError('Failed to access microphone')
+          }
+        }
+
+        // Listen for call status updates via WebSocket
+        if (presenceWsRef.current && presenceWsRef.current.readyState === WebSocket.OPEN) {
+          presenceWsRef.current.onmessage = (e) => {
+            try {
+              const data = JSON.parse(e.data)
+              if (data.type === 'call_signal') {
+                handleCallSignal(data)
+              }
+            } catch (err) { console.error('WS parse error:', err) }
+          }
+        }
+
+        // Simulate call acceptance after 3 seconds (for demo)
+        setTimeout(() => {
+          if (callStatus === 'ringing') {
+            acceptCall()
+          }
+        }, 3000)
+      } else {
+        const err = await res.json()
+        setError(err.error || 'Failed to initiate call')
+        setCallStatus('error')
+      }
+    } catch (err) {
+      setError('Failed to initiate call')
+      setCallStatus('error')
+    }
+  }
+
+  const acceptCall = async () => {
+    try {
+      await fetch(`${API_URL}/calls/${callId}/update/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'accepted' })
+      })
+      setCallStatus('connected')
+    } catch (err) {
+      console.error('Failed to accept call:', err)
+    }
+  }
+
+  const rejectCall = async () => {
+    try {
+      await fetch(`${API_URL}/calls/${callId}/update/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'rejected' })
+      })
+      onClose()
+    } catch (err) {
+      console.error('Failed to reject call:', err)
+    }
+  }
+
+  const endCall = async () => {
+    try {
+      await fetch(`${API_URL}/calls/${callId}/update/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ status: 'ended' })
+      })
+      cleanup()
+      onClose()
+    } catch (err) {
+      console.error('Failed to end call:', err)
+      cleanup()
+      onClose()
+    }
+  }
+
+  const toggleMute = () => {
+    if (localStream) {
+      const audioTrack = localStream.getAudioTracks()[0]
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled
+        setIsMuted(!audioTrack.enabled)
+      }
+    }
+  }
+
+  const toggleVideo = () => {
+    if (localStream) {
+      const videoTrack = localStream.getVideoTracks()[0]
+      if (videoTrack) {
+        videoTrack.enabled = !videoTrack.enabled
+        setIsVideoOff(!videoTrack.enabled)
+      }
+    }
+  }
+
+  const handleCallSignal = (data) => {
+    // Handle WebRTC signaling
+    console.log('Call signal received:', data)
+    // In a full implementation, this would handle WebRTC offer/answer/ICE candidates
+  }
+
+  const formatDuration = (seconds) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  if (!otherUser) return null
+
+  return (
+    <div className="call-modal-overlay">
+      <div className="call-modal">
+        <div className="call-header">
+          <div className="call-user-info">
+            <div className="call-avatar-large">
+              {otherUser.username[0].toUpperCase()}
+            </div>
+            <div>
+              <h3>{otherUser.username}</h3>
+              <p className="call-status-text">
+                {callStatus === 'initiating' && 'Initiating...'}
+                {callStatus === 'ringing' && '📞 Ringing...'}
+                {callStatus === 'connected' && `🟢 Connected ${formatDuration(duration)}`}
+                {callStatus === 'ended' && 'Call Ended'}
+                {callStatus === 'error' && '❌ Error'}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="call-close-btn">✕</button>
+        </div>
+
+        {error && (
+          <div className="call-error">
+            {error}
+          </div>
+        )}
+
+        {callType === 'video' && (
+          <div className="call-video-container">
+            {localStream && (
+              <video
+                ref={localVideoRef}
+                autoPlay
+                muted
+                className="local-video"
+              />
+            )}
+            {remoteStream && (
+              <video
+                ref={remoteVideoRef}
+                autoPlay
+                className="remote-video"
+              />
+            )}
+            {!localStream && !remoteStream && (
+              <div className="call-video-placeholder">
+                <div className="call-avatar-large">
+                  {otherUser.username[0].toUpperCase()}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {callType === 'audio' && (
+          <div className="call-audio-container">
+            <div className="call-avatar-large audio-call-avatar">
+              {otherUser.username[0].toUpperCase()}
+            </div>
+            <div className="call-audio-animation">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="audio-bar" style={{ animationDelay: `${i * 0.1}s` }}></div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="call-controls">
+          {callStatus === 'ringing' && (
+            <>
+              <button onClick={rejectCall} className="call-btn call-reject-btn">
+                📵 Reject
+              </button>
+              <button onClick={acceptCall} className="call-btn call-accept-btn">
+                ✅ Accept
+              </button>
+            </>
+          )}
+
+          {callStatus === 'connected' && (
+            <>
+              <button onClick={toggleMute} className={`call-btn ${isMuted ? 'call-btn-active' : ''}`}>
+                {isMuted ? '🔇 Unmute' : '🎤 Mute'}
+              </button>
+              {callType === 'video' && (
+                <button onClick={toggleVideo} className={`call-btn ${isVideoOff ? 'call-btn-active' : ''}`}>
+                  {isVideoOff ? '📹 Show Video' : '📹 Hide Video'}
+                </button>
+              )}
+              <button onClick={endCall} className="call-btn call-end-btn">
+                📵 End Call
+              </button>
+            </>
+          )}
+
+          {(callStatus === 'ended' || callStatus === 'error') && (
+            <button onClick={onClose} className="call-btn call-accept-btn">
+              Close
+            </button>
           )}
         </div>
       </div>
@@ -1517,6 +2026,16 @@ function App() {
             <AdminPanel user={user} token={token} />
           ) : (
             <Navigate to="/" replace />
+          )
+        }
+      />
+      <Route
+        path="/call-history"
+        element={
+          token && user ? (
+            <CallHistoryPage user={user} token={token} />
+          ) : (
+            <Navigate to="/login" replace />
           )
         }
       />

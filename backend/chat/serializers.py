@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from .models import Chat, Message, FriendRequest, UserProfile, OTP
+from .models import Chat, Message, FriendRequest, UserProfile, OTP, Call, CallHistory
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
@@ -158,3 +158,20 @@ class ChangePasswordSerializer(serializers.Serializer):
 
     class Meta:
         fields = ['old_password', 'new_password']
+
+
+class CallSerializer(serializers.ModelSerializer):
+    caller = UserSerializer(read_only=True)
+    receiver = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Call
+        fields = ['id', 'caller', 'receiver', 'call_type', 'status', 'started_at', 'ended_at', 'duration']
+
+
+class CallHistorySerializer(serializers.ModelSerializer):
+    call = CallSerializer(read_only=True)
+
+    class Meta:
+        model = CallHistory
+        fields = ['id', 'call', 'action', 'timestamp']

@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
-from .models import Chat, Message, FriendRequest, UserProfile, OTP
+from .models import Chat, Message, FriendRequest, UserProfile, OTP, Call, CallHistory
 
 
 class UserProfileInline(admin.StackedInline):
@@ -73,3 +73,19 @@ class OTPAdmin(admin.ModelAdmin):
     list_filter = ('otp_type', 'is_used', 'created_at')
     search_fields = ('user__username', 'otp_code')
     readonly_fields = ('created_at',)
+
+
+@admin.register(Call)
+class CallAdmin(admin.ModelAdmin):
+    list_display = ('id', 'caller', 'receiver', 'call_type', 'status', 'started_at', 'ended_at', 'duration')
+    list_filter = ('call_type', 'status', 'started_at')
+    search_fields = ('caller__username', 'receiver__username')
+    readonly_fields = ('started_at',)
+
+
+@admin.register(CallHistory)
+class CallHistoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'user', 'call', 'action', 'timestamp')
+    list_filter = ('action', 'timestamp')
+    search_fields = ('user__username', 'call__caller__username', 'call__receiver__username')
+    readonly_fields = ('timestamp',)

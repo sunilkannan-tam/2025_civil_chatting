@@ -95,3 +95,39 @@ class OTP(models.Model):
 
     def __str__(self):
         return f'{self.user.username} - {self.otp_type} - {self.otp_code}'
+
+
+class Call(models.Model):
+    CALL_TYPES = [
+        ('audio', 'Audio Call'),
+        ('video', 'Video Call'),
+    ]
+    CALL_STATUS = [
+        ('initiated', 'Initiated'),
+        ('ringing', 'Ringing'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+        ('missed', 'Missed'),
+        ('ended', 'Ended'),
+    ]
+
+    caller = models.ForeignKey(User, on_delete=models.CASCADE, related_name='outgoing_calls')
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='incoming_calls')
+    call_type = models.CharField(max_length=10, choices=CALL_TYPES)
+    status = models.CharField(max_length=20, choices=CALL_STATUS, default='initiated')
+    started_at = models.DateTimeField(auto_now_add=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    duration = models.IntegerField(default=0, help_text='Duration in seconds')
+
+    def __str__(self):
+        return f'{self.caller.username} -> {self.receiver.username} ({self.call_type})'
+
+
+class CallHistory(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='call_history')
+    call = models.ForeignKey(Call, on_delete=models.CASCADE, related_name='history')
+    action = models.CharField(max_length=20, help_text='e.g., initiated, accepted, rejected, ended')
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.user.username} - {self.action} - {self.call}'

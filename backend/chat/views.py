@@ -9,12 +9,13 @@ from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django.contrib.auth.models import User
 from django.db.models import Q
-from .models import Chat, Message, FriendRequest, UserProfile, OTP
+from .models import Chat, Message, FriendRequest, UserProfile, OTP, Call, CallHistory
 from .serializers import (
     UserSerializer, ChatSerializer, MessageSerializer,
     RegisterSerializer, FriendRequestSerializer,
     ProfileUpdateSerializer, OTPSendSerializer,
-    OTPVerifySerializer, ChangePasswordSerializer
+    OTPVerifySerializer, ChangePasswordSerializer,
+    CallSerializer, CallHistorySerializer
 )
 from .utils import send_email_otp, send_sms_otp
 from rest_framework.permissions import IsAuthenticated
@@ -425,3 +426,99 @@ class AdminDeleteUserView(APIView):
         return Response({
             'message': f'User "{username}" has been deleted successfully'
         }, status=status.HTTP_200_OK)
+
+
+class InitiateCallView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        receiver_id = request.data.get('receiver_id')
+        call_type = request.data.get('call_type', 'audio')
+
+        if not receiver_id:
+            return Response({'error': 'receiver_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if call_type not in ['audio', 'video']:
+            return Response({'error': 'call_type must be audio or video'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            receiver = User.objects.get(id=receiver_id)
+        except User.DoesNotExist:
+            return Response({'error': 'Receiver not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Create call record
+        call = Call.objects.create(
+            caller=request.user,
+            receiver=receiver,
+            call_type=call_type,
+            status='initiated'
+        )
+
+        # Create call history entries
+        CallHistory.objects.create(user=request.user, call=call, action='initiated')
+        CallHistory.objects.create(user=receiver, call=call, action='initiated')
+
+        serializer = CallSerializer(call, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class UpdateCallStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, call_id):
+        try:
+            call = Call.objects.get(id=call_id)
+        except Call.DoesNotExist:
+            return Response({'error': 'Call not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        new_status = request.data.get('status')
+        if not new_status:
+            return Response({'error': 'status is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        valid_statuses = ['ringing', 'accepted', 'rejected', 'missed', 'ended']
+        if new_status not in valid_statuses:
+            return Response({'error': f'Invalid status. Must be one of: {", ".join(valid_statuses)}'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Update call status
+        call.status = new_status
+        if new_status in ['ended', 'rejected', 'missed']:
+            call.ended_at = timezone.now()
+            if call.started_at:
+                call.duration = int((call.ended_at - call.started_at).total_seconds())
+        call.save()
+
+        # Create history entry for the current user
+        CallHistory.objects.create(user=request.user, call=call, action=new_status)
+
+        serializer = CallSerializer(call, context={'request': request})
+        return Response(serializer.data)
+
+
+class CallHistoryListView(generics.ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = CallHistorySerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        # Get all call history where user is either caller or receiver
+        return CallHistory.objects.filter(
+            Q(call__caller=user) | Q(call__receiver=user)
+        ).select_related('call', 'call__caller', 'call__receiver').order_by('-timestamp')
+
+
+class AdminCallHistoryListView(APIView):
+    """
+    Admin-only view to see all call history in the system.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not request.user.is_superuser:
+            return Response({'error': 'Admin access required'}, status=status.HTTP_403_FORBIDDEN)
+
+        call_history = CallHistory.objects.all().select_related(
+            'call', 'call__caller', 'call__receiver', 'user'
+        ).order_by('-timestamp')
+
+        serializer = CallHistorySerializer(call_history, many=True, context={'request': request})
+        return Response(serializer.data)

@@ -3,7 +3,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import Chat, Message, UserProfile
+from .models import Chat, Message, UserProfile, Call, CallHistory
 from .serializers import MessageSerializer
 
 
@@ -139,6 +139,25 @@ class ChatConsumer(AsyncWebsocketConsumer):
                     'user_id': self.user.id
                 }
             )
+        elif action == 'call_signal':
+            # WebRTC signaling for calls
+            target_user_id = text_data_json.get('target_user_id')
+            signal_data = text_data_json.get('signal_data')
+            signal_type = text_data_json.get('signal_type', 'offer')
+
+            if target_user_id and signal_data:
+                # Send signal to specific user via presence group
+                await self.channel_layer.group_send(
+                    'presence',
+                    {
+                        'type': 'call_signal',
+                        'from_user_id': self.user.id,
+                        'target_user_id': target_user_id,
+                        'signal_type': signal_type,
+                        'signal_data': signal_data,
+                        'chat_id': self.chat_id
+                    }
+                )
 
     async def chat_message(self, event):
         message = event['message']
@@ -153,3 +172,14 @@ class ChatConsumer(AsyncWebsocketConsumer):
             'type': 'read',
             'user_id': user_id
         }))
+
+    async def call_signal(self, event):
+        # Only send to the target user
+        if self.user.id == event.get('target_user_id'):
+            await self.send(text_data=json.dumps({
+                'type': 'call_signal',
+                'from_user_id': event['from_user_id'],
+                'signal_type': event['signal_type'],
+                'signal_data': event['signal_data'],
+                'chat_id': event.get('chat_id')
+            }))
