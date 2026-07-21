@@ -12,11 +12,14 @@ class UserProfileSerializer(serializers.ModelSerializer):
         fields = ['profile_picture', 'is_online', 'last_active', 'phone_number', 'email_verified', 'phone_verified']
 
     def get_profile_picture(self, obj):
-        if obj.profile_picture:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.profile_picture.url)
-            return obj.profile_picture.url
+        try:
+            if obj.profile_picture:
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(obj.profile_picture.url)
+                return obj.profile_picture.url
+        except Exception:
+            pass
         return None
 
 
@@ -28,9 +31,12 @@ class UserSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'profile', 'is_superuser']
 
     def get_profile(self, obj):
-        profile = getattr(obj, 'profile', None)
-        if profile:
-            return UserProfileSerializer(profile, context=self.context).data
+        try:
+            profile = obj.profile
+            if profile:
+                return UserProfileSerializer(profile, context=self.context).data
+        except Exception:
+            pass
         return None
 
 
@@ -56,7 +62,6 @@ class MessageSerializer(serializers.ModelSerializer):
         file_obj = request.FILES.get('file') if request and request.FILES else None
         
         if file_obj:
-            # Determine file type
             content_type = file_obj.content_type or ''
             ext = file_obj.name.split('.')[-1].lower() if '.' in file_obj.name else ''
             
@@ -89,13 +94,13 @@ class ChatSerializer(serializers.ModelSerializer):
     def get_other_user(self, obj):
         user = self.context['request'].user
         if obj.user1 == user:
-            return UserSerializer(obj.user2).data
-        return UserSerializer(obj.user1).data
+            return UserSerializer(obj.user2, context=self.context).data
+        return UserSerializer(obj.user1, context=self.context).data
 
     def get_last_message(self, obj):
         last_msg = obj.messages.order_by('-timestamp').first()
         if last_msg:
-            return MessageSerializer(last_msg).data
+            return MessageSerializer(last_msg, context=self.context).data
         return None
 
 
@@ -113,7 +118,6 @@ class RegisterSerializer(serializers.ModelSerializer):
             email=validated_data['email'],
             password=validated_data['password']
         )
-        # Create a UserProfile if not already created by signal
         UserProfile.objects.get_or_create(user=user)
         return user
 
@@ -132,7 +136,7 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
 
 class OTPSendSerializer(serializers.Serializer):
     otp_type = serializers.ChoiceField(choices=['email', 'phone'])
-    value = serializers.CharField()  # email address or phone number
+    value = serializers.CharField()
 
     class Meta:
         fields = ['otp_type', 'value']
