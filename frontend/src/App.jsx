@@ -2216,12 +2216,15 @@ function Settings({ user, token }) {
 function App() {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(localStorage.getItem('token'))
+  const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
-    if (token && !user) {
+    if (token) {
       fetchCurrentUser()
+    } else {
+      setInitializing(false)
     }
-  }, [token])
+  }, [])
 
   const fetchCurrentUser = async () => {
     try {
@@ -2230,7 +2233,6 @@ function App() {
         const userData = await res.json()
         setUser(userData)
       } else {
-        // Token invalid, clear it
         localStorage.removeItem('token')
         localStorage.removeItem('refresh')
         setToken(null)
@@ -2242,6 +2244,8 @@ function App() {
       localStorage.removeItem('refresh')
       setToken(null)
       setUser(null)
+    } finally {
+      setInitializing(false)
     }
   }
 
@@ -2250,6 +2254,16 @@ function App() {
     localStorage.removeItem('refresh')
     setToken(null)
     setUser(null)
+  }
+
+  if (initializing) {
+    return (
+      <div className="loading-screen">
+        <div className="loading-logo">💬</div>
+        <div className="loading-spinner"></div>
+        <p>Loading Civil_2026 Chatting...</p>
+      </div>
+    )
   }
 
   return (

@@ -12,6 +12,10 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-dev-secret-key-change-me-i
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+# Ensure the full backend hostname is always allowed
+_backend_host = os.getenv('RENDER_EXTERNAL_HOSTNAME', '')
+if _backend_host and _backend_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_backend_host)
 
 INSTALLED_APPS = [
     'daphne',
