@@ -237,22 +237,32 @@ class ChatListView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        # Only get chats where there's an accepted friend request
-        accepted_requests = FriendRequest.objects.filter(
-            Q(from_user=user, is_accepted=True) | Q(
-                to_user=user, is_accepted=True)
-        )
-        chat_user_ids = set()
-        for req in accepted_requests:
-            if req.from_user == user:
-                chat_user_ids.add(req.to_user.id)
-            else:
-                chat_user_ids.add(req.from_user.id)
+        try:
+            accepted_requests = FriendRequest.objects.filter(
+                Q(from_user=user, is_accepted=True) | Q(
+                    to_user=user, is_accepted=True)
+            )
+            chat_user_ids = set()
+            for req in accepted_requests:
+                if req.from_user == user:
+                    chat_user_ids.add(req.to_user.id)
+                else:
+                    chat_user_ids.add(req.from_user.id)
 
-        return Chat.objects.filter(
-            Q(user1=user, user2_id__in=chat_user_ids) |
-            Q(user2=user, user1_id__in=chat_user_ids)
-        ).order_by('-created_at')
+            return Chat.objects.filter(
+                Q(user1=user, user2_id__in=chat_user_ids) |
+                Q(user2=user, user1_id__in=chat_user_ids)
+            ).order_by('-created_at')
+        except Exception as e:
+            logger.error(f"ChatListView queryset error for user {user.id}: {e}", exc_info=True)
+            return Chat.objects.none()
+
+    def list(self, request, *args, **kwargs):
+        try:
+            return super().list(request, *args, **kwargs)
+        except Exception as e:
+            logger.error(f"ChatListView list error: {e}", exc_info=True)
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class MessageListView(generics.ListCreateAPIView):
