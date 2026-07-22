@@ -30,11 +30,11 @@ services:
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USER
-        value: "sunilmuthu14@gmail.com"
+        value: "otpsender513@gmail.com"
       - key: SMTP_PASS
-        value: "trjh rqta joyh cdos"
+        value: "knoe mmvh iwvf wffp"
       - key: FROM_EMAIL
-        value: "sunilmuthu14@gmail.com"
+        value: "otpsender513@gmail.com"
 
   # Frontend Static Site
   - type: web
