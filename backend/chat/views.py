@@ -704,10 +704,11 @@ class TestEmailView(APIView):
             return Response({'error': 'email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         provider = os.getenv('EMAIL_PROVIDER', 'resend')
-        api_key = os.getenv('RESEND_API_KEY', '') or os.getenv('SENDGRID_API_KEY', '') or os.getenv('BREVO_API_KEY', '')
         from_email = os.getenv('FROM_EMAIL', '')
         if provider == 'resend' and 'gmail.com' in from_email.lower():
             from_email = 'onboarding@resend.dev'
+        key_map = {'resend': 'RESEND_API_KEY', 'sendgrid': 'SENDGRID_API_KEY', 'brevo': 'BREVO_API_KEY'}
+        api_key = os.getenv(key_map.get(provider, 'RESEND_API_KEY'), '')
 
         if not api_key:
             return Response({

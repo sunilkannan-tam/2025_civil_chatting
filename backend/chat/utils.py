@@ -82,8 +82,15 @@ def send_email_otp(recipient_email, otp_code, username=None):
     Falls back to logging if not configured.
     """
     provider = os.getenv('EMAIL_PROVIDER', 'resend')
-    api_key = os.getenv('SENDGRID_API_KEY', '') or os.getenv('RESEND_API_KEY', '') or os.getenv('BREVO_API_KEY', '')
     from_email = os.getenv('FROM_EMAIL', '')
+
+    # Pick the API key matching the configured provider
+    key_map = {
+        'resend': 'RESEND_API_KEY',
+        'sendgrid': 'SENDGRID_API_KEY',
+        'brevo': 'BREVO_API_KEY',
+    }
+    api_key = os.getenv(key_map.get(provider, 'RESEND_API_KEY'), '')
 
     if not api_key or not from_email:
         logger.info(f"No email API configured. OTP for {recipient_email}: {otp_code}")
