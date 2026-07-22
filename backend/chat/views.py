@@ -715,12 +715,51 @@ class TestEmailView(APIView):
             })
 
         test_otp = str(random.randint(100000, 999999))
-        sent = send_email_otp(email, test_otp, username='Test')
 
-        return Response({
-            'sent': sent,
-            'otp_code': test_otp if not sent else None,
-            'provider': provider,
-            'from_email': from_email,
-            'message': f'Email sent to {email}' if sent else 'Email failed - check Render logs for details',
-        })
+        # Direct API call with full error reporting
+        import json as _json
+        from urllib.request import Request, urlopen
+        from urllib.error import HTTPError, URLError
+
+        text = f'Your OTP is: {test_otp}'
+        html_content = f'<h2>Your OTP: <b>{test_otp}</b></h2>'
+
+        try:
+            if provider == 'resend':
+                payload = {
+                    "from": f"Civil_2026 Chatting <{from_email}>",
+                    "to": [email],
+                    "subject": "Your OTP - Civil_2026 Chatting",
+                    "text": text,
+                    "html": html_content,
+                }
+            elif provider == 'sendgrid':
+                payload = {
+                    "personalizations": [{"to": [{"email": email}]}],
+                    "from": {"email": from_email, "name": "Civil_2026 Chatting"},
+                    "subject": "Your OTP - Civil_2026 Chatting",
+                    "content": [{"type": "text/plain", "value": text}, {"type": "text/html", "value": html_content}],
+                }
+            else:
+                return Response({'sent': False, 'error': f'Unknown provider: {provider}'})
+
+            data = _json.dumps(payload).encode('utf-8')
+            url = 'https://api.resend.com/emails' if provider == 'resend' else 'https://api.sendgrid.com/v3/mail/send'
+            auth_key = api_key
+            hdrs = {
+                'Authorization': f'Bearer {auth_key}',
+                'Content-Type': 'application/json',
+                'User-Agent': 'Civil2026-Chatting/1.0',
+            }
+            req = Request(url, data=data, headers=hdrs, method='POST')
+            resp = urlopen(req, timeout=15)
+            body = resp.read().decode() if hasattr(resp, 'read') else ''
+            return Response({'sent': True, 'otp_code': test_otp, 'status': resp.status, 'response': body})
+
+        except HTTPError as e:
+            err_body = e.read().decode('utf-8', errors='replace') if hasattr(e, 'read') else ''
+            return Response({'sent': False, 'otp_code': test_otp, 'error': f'{provider} HTTP {e.code}: {err_body[:500]}', 'from_email': from_email, 'provider': provider})
+        except URLError as e:
+            return Response({'sent': False, 'error': f'Network error: {str(e)}', 'provider': provider})
+        except Exception as e:
+            return Response({'sent': False, 'error': f'{type(e).__name__}: {str(e)}', 'provider': provider})
