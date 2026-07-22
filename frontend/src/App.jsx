@@ -6,6 +6,47 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api'
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/ws'
 const MEDIA_URL = import.meta.env.VITE_MEDIA_URL || 'http://localhost:8000'
 
+async function authFetch(url, options = {}) {
+  let token = localStorage.getItem('token')
+  if (!token) throw new Error('No token')
+  const headers = { ...options.headers, 'Authorization': `Bearer ${token}` }
+  let res = await fetch(url, { ...options, headers })
+  if (res.status === 401) {
+    const refresh = localStorage.getItem('refresh')
+    if (refresh) {
+      try {
+        const refreshRes = await fetch(`${API_URL.replace(/\/api\/?$/, '')}/api/token/refresh/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refresh })
+        })
+        if (refreshRes.ok) {
+          const data = await refreshRes.json()
+          localStorage.setItem('token', data.access)
+          token = data.access
+          headers['Authorization'] = `Bearer ${token}`
+          res = await fetch(url, { ...options, headers })
+        } else {
+          localStorage.removeItem('token')
+          localStorage.removeItem('refresh')
+          window.location.href = '/login'
+          throw new Error('Token refresh failed')
+        }
+      } catch {
+        localStorage.removeItem('token')
+        localStorage.removeItem('refresh')
+        window.location.href = '/login'
+        throw new Error('Token refresh failed')
+      }
+    } else {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      throw new Error('No refresh token')
+    }
+  }
+  return res
+}
+
 function Avatar({ user, size = 40, className = '' }) {
   const photoUrl = user?.profile?.profile_picture
 
@@ -553,30 +594,28 @@ function ChatDashboard({ user, token, handleLogout }) {
 
   const fetchChats = async () => {
     try {
-      const res = await fetch(`${API_URL}/chats/`, { headers: { 'Authorization': `Bearer ${token}` } })
+      const res = await authFetch(`${API_URL}/chats/`)
       if (res.ok) setChats(await res.json())
     } catch (err) { console.error(err) }
   }
 
   const fetchUsers = async () => {
     try {
-      const res = await fetch(`${API_URL}/users/`, { headers: { 'Authorization': `Bearer ${token}` } })
+      const res = await authFetch(`${API_URL}/users/`)
       if (res.ok) setUsers(await res.json())
     } catch (err) { console.error(err) }
   }
 
   const fetchFriendRequests = async () => {
     try {
-      const res = await fetch(`${API_URL}/friend-requests/`, { headers: { 'Authorization': `Bearer ${token}` } })
+      const res = await authFetch(`${API_URL}/friend-requests/`)
       if (res.ok) setFriendRequests(await res.json())
     } catch (err) { console.error(err) }
   }
 
   const fetchMessages = async () => {
     try {
-      const res = await fetch(`${API_URL}/chats/${selectedChat.id}/messages/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      const res = await authFetch(`${API_URL}/chats/${selectedChat.id}/messages/`)
       if (res.ok) setMessages(await res.json())
     } catch (err) { console.error(err) }
   }
@@ -615,9 +654,9 @@ function ChatDashboard({ user, token, handleLogout }) {
 
   const sendFriendRequest = async (toUser) => {
     try {
-      const res = await fetch(`${API_URL}/friend-requests/`, {
+      const res = await authFetch(`${API_URL}/friend-requests/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ to_user: toUser.id })
       })
       if (res.ok) {
@@ -629,8 +668,8 @@ function ChatDashboard({ user, token, handleLogout }) {
 
   const acceptFriendRequest = async (requestId) => {
     try {
-      await fetch(`${API_URL}/friend-requests/${requestId}/accept/`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+      await authFetch(`${API_URL}/friend-requests/${requestId}/accept/`, {
+        method: 'POST'
       })
       fetchFriendRequests()
       fetchChats()
@@ -639,8 +678,8 @@ function ChatDashboard({ user, token, handleLogout }) {
 
   const rejectFriendRequest = async (requestId) => {
     try {
-      await fetch(`${API_URL}/friend-requests/${requestId}/reject/`, {
-        method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
+      await authFetch(`${API_URL}/friend-requests/${requestId}/reject/`, {
+        method: 'POST'
       })
       fetchFriendRequests()
     } catch (err) { console.error(err) }
@@ -671,9 +710,9 @@ function ChatDashboard({ user, token, handleLogout }) {
       chatWsRef.current.send(JSON.stringify({ action: 'send_message', text }))
     } else {
       try {
-        const res = await fetch(`${API_URL}/chats/${selectedChat.id}/messages/`, {
+        const res = await authFetch(`${API_URL}/chats/${selectedChat.id}/messages/`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text })
         })
         if (res.ok) {
@@ -693,9 +732,8 @@ function ChatDashboard({ user, token, handleLogout }) {
     formData.append('file', file)
     formData.append('text', '')
     try {
-      const res = await fetch(`${API_URL}/chats/${selectedChat.id}/messages/`, {
+      const res = await authFetch(`${API_URL}/chats/${selectedChat.id}/messages/`, {
         method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       })
       if (res.ok) {
@@ -724,9 +762,8 @@ function ChatDashboard({ user, token, handleLogout }) {
 
   const deleteMessage = async (messageId) => {
     try {
-      const res = await fetch(`${API_URL}/messages/${messageId}/delete/`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await authFetch(`${API_URL}/messages/${messageId}/delete/`, {
+        method: 'POST'
       })
       if (res.ok) {
         setMessages(prev => prev.filter(msg => msg.id !== messageId))
@@ -1274,9 +1311,7 @@ function AdminPanel({ user, token }) {
   const fetchUsers = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/admin/users/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      const res = await authFetch(`${API_URL}/admin/users/`)
       if (res.ok) {
         setUsers(await res.json())
       } else {
@@ -1293,9 +1328,8 @@ function AdminPanel({ user, token }) {
   const handleDeleteUser = async (userId) => {
     setDeletingId(userId)
     try {
-      const res = await fetch(`${API_URL}/admin/users/${userId}/delete/`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
+      const res = await authFetch(`${API_URL}/admin/users/${userId}/delete/`, {
+        method: 'DELETE'
       })
       const data = await res.json()
       if (res.ok) {
@@ -1409,9 +1443,7 @@ function CallHistoryPage({ user, token }) {
   const fetchCallHistory = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/calls/history/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      const res = await authFetch(`${API_URL}/calls/history/`)
       if (res.ok) {
         setCallHistory(await res.json())
       } else {
@@ -1593,11 +1625,10 @@ function CallModal({ user, token, selectedChat, onClose, presenceWsRef }) {
   const initiateCall = async () => {
     try {
       // Initiate call via API
-      const res = await fetch(`${API_URL}/calls/initiate/`, {
+      const res = await authFetch(`${API_URL}/calls/initiate/`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           receiver_id: otherUser.id,
@@ -1674,11 +1705,10 @@ function CallModal({ user, token, selectedChat, onClose, presenceWsRef }) {
 
   const acceptCall = async () => {
     try {
-      await fetch(`${API_URL}/calls/${callId}/update/`, {
+      await authFetch(`${API_URL}/calls/${callId}/update/`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: 'accepted' })
       })
@@ -1690,11 +1720,10 @@ function CallModal({ user, token, selectedChat, onClose, presenceWsRef }) {
 
   const rejectCall = async () => {
     try {
-      await fetch(`${API_URL}/calls/${callId}/update/`, {
+      await authFetch(`${API_URL}/calls/${callId}/update/`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: 'rejected' })
       })
@@ -1706,11 +1735,10 @@ function CallModal({ user, token, selectedChat, onClose, presenceWsRef }) {
 
   const endCall = async () => {
     try {
-      await fetch(`${API_URL}/calls/${callId}/update/`, {
+      await authFetch(`${API_URL}/calls/${callId}/update/`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status: 'ended' })
       })
@@ -1917,9 +1945,8 @@ function Settings({ user, token }) {
       if (phoneNumber !== (user?.profile?.phone_number || '')) formData.append('phone_number', phoneNumber)
       if (countryCode !== (user?.profile?.country_code || '+91')) formData.append('country_code', countryCode)
 
-      const res = await fetch(`${API_URL}/profile/update/`, {
+      const res = await authFetch(`${API_URL}/profile/update/`, {
         method: 'PATCH',
-        headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       })
 
@@ -1945,9 +1972,9 @@ function Settings({ user, token }) {
     e.preventDefault()
     setChangingPassword(true)
     try {
-      const res = await fetch(`${API_URL}/change-password/`, {
+      const res = await authFetch(`${API_URL}/change-password/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
       })
       if (res.ok) {
@@ -1977,9 +2004,9 @@ function Settings({ user, token }) {
       if (otpType === 'phone') {
         payload.country_code = countryCode
       }
-      const res = await fetch(`${API_URL}/profile/send-otp/`, {
+      const res = await authFetch(`${API_URL}/profile/send-otp/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
       if (res.ok) {
@@ -2000,9 +2027,9 @@ function Settings({ user, token }) {
   const handleVerifyOtp = async () => {
     setVerifying(true)
     try {
-      const res = await fetch(`${API_URL}/profile/verify-otp/`, {
+      const res = await authFetch(`${API_URL}/profile/verify-otp/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ otp_type: otpType, otp_code: otpCode })
       })
       if (res.ok) {
@@ -2198,9 +2225,7 @@ function App() {
 
   const fetchCurrentUser = async () => {
     try {
-      const res = await fetch(`${API_URL}/user/`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+      const res = await authFetch(`${API_URL}/user/`)
       if (res.ok) {
         const userData = await res.json()
         setUser(userData)
@@ -2213,6 +2238,10 @@ function App() {
       }
     } catch (err) {
       console.error('Failed to fetch user:', err)
+      localStorage.removeItem('token')
+      localStorage.removeItem('refresh')
+      setToken(null)
+      setUser(null)
     }
   }
 

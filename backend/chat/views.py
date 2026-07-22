@@ -536,13 +536,15 @@ class ForgotPasswordView(APIView):
         sent = send_email_otp(user.email, otp_code, username=user.username)
         if sent:
             logger.info(f"Password reset OTP sent to {user.email}")
-            return Response({'message': 'OTP sent to your email'})
         else:
             logger.info(f"Password reset OTP for {user.username}: {otp_code}")
-            return Response({
-                'message': 'OTP sent to your email',
-                'otp_code': otp_code  # Only returned in dev mode if email sending failed
-            })
+
+        # Always return otp_code in development mode for testing
+        from django.conf import settings
+        response_data = {'message': 'OTP sent to your email'}
+        if settings.DEBUG:
+            response_data['otp_code'] = otp_code
+        return Response(response_data)
 
 
 class ResetPasswordView(APIView):
