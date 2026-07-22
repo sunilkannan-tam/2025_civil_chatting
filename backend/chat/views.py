@@ -567,8 +567,10 @@ class ForgotPasswordView(APIView):
             return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = User.objects.get(email=email)
-        except User.DoesNotExist:
+            user = User.objects.filter(email=email).first()
+            if not user:
+                return Response({'error': 'User with this email not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception:
             return Response({'error': 'User with this email not found'}, status=status.HTTP_404_NOT_FOUND)
 
         # Generate OTP for password reset
