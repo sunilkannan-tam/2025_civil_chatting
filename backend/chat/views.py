@@ -703,42 +703,12 @@ class TestEmailView(APIView):
             return Response({'error': 'email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
         provider = os.getenv('EMAIL_PROVIDER', 'resend')
-        from_email = os.getenv('FROM_EMAIL', '')
-        if provider == 'resend' and 'gmail.com' in from_email.lower():
-            from_email = 'onboarding@resend.dev'
-        key_map = {'resend': 'RESEND_API_KEY', 'sendgrid': 'SENDGRID_API_KEY', 'brevo': 'BREVO_API_KEY'}
-        api_key = os.getenv(key_map.get(provider, 'RESEND_API_KEY'), '')
-
-        if not api_key:
-            return Response({'sent': False, 'error': 'No API key set', 'provider': provider})
-
-        import json as _json
-        from urllib.request import Request, urlopen
-        from urllib.error import HTTPError, URLError
-
         test_otp = str(random.randint(100000, 999999))
-        text = f'Your OTP is: {test_otp}'
-        html = f'<h2>Your OTP: <b>{test_otp}</b></h2>'
+        sent = send_email_otp(email, test_otp, username='Test')
 
-        try:
-            payload = {
-                "from": f"Civil_2026 Chatting <{from_email}>",
-                "to": [email],
-                "subject": "Your OTP - Civil_2026 Chatting",
-                "text": text,
-                "html": html,
-            }
-            data = _json.dumps(payload).encode('utf-8')
-            req = Request('https://api.resend.com/emails', data=data, headers={
-                'Authorization': f'Bearer {api_key}',
-                'Content-Type': 'application/json',
-                'User-Agent': 'Civil2026-Chatting/1.0',
-            }, method='POST')
-            resp = urlopen(req, timeout=15)
-            body = resp.read().decode()
-            return Response({'sent': True, 'otp_code': test_otp, 'response': body, 'from': from_email})
-        except HTTPError as e:
-            err = e.read().decode('utf-8', errors='replace') if hasattr(e, 'read') else ''
-            return Response({'sent': False, 'otp_code': test_otp, 'error': f'HTTP {e.code}: {err[:500]}', 'from': from_email})
-        except Exception as e:
-            return Response({'sent': False, 'error': f'{type(e).__name__}: {e}', 'from': from_email})
+        return Response({
+            'sent': sent,
+            'otp_code': test_otp if not sent else None,
+            'provider': provider,
+            'message': f'Email sent to {email}' if sent else 'Email failed - check server logs',
+        })
