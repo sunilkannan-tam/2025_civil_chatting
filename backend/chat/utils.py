@@ -102,8 +102,20 @@ Civil_2026 Chatting Team
         
         logger.info(f"OTP email sent to {recipient_email}")
         return True
+    except smtplib.SMTPAuthenticationError as e:
+        logger.error(f"SMTP auth error for {recipient_email}: {e}")
+        return False
+    except smtplib.SMTPConnectError as e:
+        logger.error(f"SMTP connect error for {recipient_email}: {e}")
+        return False
+    except socket.timeout as e:
+        logger.error(f"SMTP timeout for {recipient_email}: {e}")
+        return False
+    except socket.gaierror as e:
+        logger.error(f"DNS error for {recipient_email}: {e}")
+        return False
     except Exception as e:
-        logger.error(f"Failed to send email to {recipient_email}: {e}")
+        logger.error(f"Failed to send email to {recipient_email}: {type(e).__name__}: {e}")
         return False
 
 
