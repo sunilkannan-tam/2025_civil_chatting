@@ -145,7 +145,7 @@ Civil_2026 Chatting Team
         }
 
         if provider == 'resend':
-            from_addr = f"Civil_2026 Chatting <{from_email}>"
+            from_addr = f"Civil_2026 Chatting <{from_email}>" if 'resend.dev' not in from_email else from_email
             status = _send_via_resend(api_key, from_addr, recipient_email, subject, text_content, html_content, headers)
         elif provider == 'sendgrid':
             status = _send_via_sendgrid(api_key, from_email, recipient_email, subject, text_content, html_content, headers)
