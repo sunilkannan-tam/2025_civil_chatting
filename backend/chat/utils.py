@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'resend')
 
 
-def _send_via_sendgrid(api_key, from_email, recipient_email, subject, text, html):
+def _send_via_sendgrid(api_key, from_email, recipient_email, subject, text, html, headers=None):
     payload = {
         "personalizations": [{"to": [{"email": recipient_email}]}],
         "from": {"email": from_email, "name": "Civil_2026 Chatting"},
@@ -20,20 +20,19 @@ def _send_via_sendgrid(api_key, from_email, recipient_email, subject, text, html
         ],
     }
     data = json.dumps(payload).encode('utf-8')
-    req = Request(
-        'https://api.sendgrid.com/v3/mail/send',
-        data=data,
-        headers={
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-        },
-        method='POST',
-    )
+    hdrs = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Civil2026-Chatting/1.0',
+    }
+    if headers:
+        hdrs.update(headers)
+    req = Request('https://api.sendgrid.com/v3/mail/send', data=data, headers=hdrs, method='POST')
     resp = urlopen(req, timeout=15)
     return resp.status
 
 
-def _send_via_resend(api_key, from_email, recipient_email, subject, text, html):
+def _send_via_resend(api_key, from_email, recipient_email, subject, text, html, headers=None):
     payload = {
         "from": from_email,
         "to": [recipient_email],
@@ -42,20 +41,19 @@ def _send_via_resend(api_key, from_email, recipient_email, subject, text, html):
         "html": html,
     }
     data = json.dumps(payload).encode('utf-8')
-    req = Request(
-        'https://api.resend.com/emails',
-        data=data,
-        headers={
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
-        },
-        method='POST',
-    )
+    hdrs = {
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+        'User-Agent': 'Civil2026-Chatting/1.0',
+    }
+    if headers:
+        hdrs.update(headers)
+    req = Request('https://api.resend.com/emails', data=data, headers=hdrs, method='POST')
     resp = urlopen(req, timeout=15)
     return resp.status
 
 
-def _send_via_brevo(api_key, from_email, recipient_email, subject, text, html):
+def _send_via_brevo(api_key, from_email, recipient_email, subject, text, html, headers=None):
     payload = {
         "sender": {"email": from_email, "name": "Civil_2026 Chatting"},
         "to": [{"email": recipient_email}],
@@ -64,16 +62,15 @@ def _send_via_brevo(api_key, from_email, recipient_email, subject, text, html):
         "htmlContent": html,
     }
     data = json.dumps(payload).encode('utf-8')
-    req = Request(
-        'https://api.brevo.com/v3/smtp/email',
-        data=data,
-        headers={
-            'api-key': api_key,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-        },
-        method='POST',
-    )
+    hdrs = {
+        'api-key': api_key,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Civil2026-Chatting/1.0',
+    }
+    if headers:
+        hdrs.update(headers)
+    req = Request('https://api.brevo.com/v3/smtp/email', data=data, headers=hdrs, method='POST')
     resp = urlopen(req, timeout=15)
     return resp.status
 
@@ -141,12 +138,19 @@ Civil_2026 Chatting Team
     from_addr = f"Civil_2026 Chatting <{from_email}>"
 
     try:
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+            'User-Agent': 'Civil2026-Chatting/1.0',
+        }
+
         if provider == 'resend':
-            status = _send_via_resend(api_key, from_addr, recipient_email, subject, text_content, html_content)
+            from_addr = f"Civil_2026 Chatting <{from_email}>"
+            status = _send_via_resend(api_key, from_addr, recipient_email, subject, text_content, html_content, headers)
         elif provider == 'sendgrid':
-            status = _send_via_sendgrid(api_key, from_email, recipient_email, subject, text_content, html_content)
+            status = _send_via_sendgrid(api_key, from_email, recipient_email, subject, text_content, html_content, headers)
         elif provider == 'brevo':
-            status = _send_via_brevo(api_key, from_email, recipient_email, subject, text_content, html_content)
+            status = _send_via_brevo(api_key, from_email, recipient_email, subject, text_content, html_content, headers)
         else:
             logger.error(f"Unknown email provider: {provider}")
             return False
