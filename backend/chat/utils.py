@@ -89,6 +89,10 @@ def send_email_otp(recipient_email, otp_code, username=None):
         logger.info(f"No email API configured. OTP for {recipient_email}: {otp_code}")
         return False
 
+    # Resend free tier requires onboarding@resend.dev (can't use gmail.com)
+    if provider == 'resend' and 'gmail.com' in from_email.lower():
+        from_email = 'onboarding@resend.dev'
+
     greeting = f"Hi {username}," if username else "Hi there,"
 
     text_content = f"""

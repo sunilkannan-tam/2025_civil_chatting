@@ -706,6 +706,8 @@ class TestEmailView(APIView):
         provider = os.getenv('EMAIL_PROVIDER', 'resend')
         api_key = os.getenv('RESEND_API_KEY', '') or os.getenv('SENDGRID_API_KEY', '') or os.getenv('BREVO_API_KEY', '')
         from_email = os.getenv('FROM_EMAIL', '')
+        if provider == 'resend' and 'gmail.com' in from_email.lower():
+            from_email = 'onboarding@resend.dev'
 
         if not api_key:
             return Response({
