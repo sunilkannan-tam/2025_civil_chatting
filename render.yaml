@@ -32,7 +32,7 @@ services:
       - key: SMTP_USER
         value: "sunilmuthu14@gmail.com"
       - key: SMTP_PASS
-        sync: false
+        value: "trjh rqta joyh cdos"
       - key: FROM_EMAIL
         value: "sunilmuthu14@gmail.com"
 

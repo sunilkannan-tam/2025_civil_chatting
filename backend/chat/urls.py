@@ -38,4 +38,7 @@ urlpatterns = [
 
     # Message delete route
     path('messages/<int:pk>/delete/', views.MessageDeleteView.as_view(), name='delete-message'),
+
+    # Debug route
+    path('test-email/', views.TestEmailView.as_view(), name='test-email'),
 ]

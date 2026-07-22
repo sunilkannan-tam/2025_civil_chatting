@@ -1,3 +1,4 @@
+import os
 import random
 import logging
 from django.utils import timezone
@@ -689,3 +690,28 @@ class AdminCallHistoryListView(APIView):
 
         serializer = CallHistorySerializer(call_history, many=True, context={'request': request})
         return Response(serializer.data)
+
+
+class TestEmailView(APIView):
+    """
+    Test email sending. Send a test OTP to verify SMTP config works.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'email is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        test_otp = str(random.randint(100000, 999999))
+        sent = send_email_otp(email, test_otp, username='Test')
+
+        return Response({
+            'sent': sent,
+            'otp_code': test_otp,
+            'message': 'Email sent successfully' if sent else 'Email failed - check SMTP config',
+            'smtp_host': os.getenv('SMTP_HOST', 'NOT SET'),
+            'smtp_user': os.getenv('SMTP_USER', 'NOT SET'),
+            'smtp_pass_set': bool(os.getenv('SMTP_PASS', '')),
+            'from_email': os.getenv('FROM_EMAIL', 'NOT SET'),
+        })
