@@ -110,6 +110,52 @@ class RegistrationOTPVerifyView(APIView):
         })
 
 
+class ResendRegistrationOTPView(APIView):
+    """
+    Resend email OTP during registration. Accessible without authentication.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        user_id = request.data.get('user_id')
+        email = request.data.get('email')
+
+        if not user_id or not email:
+            return Response({'error': 'user_id and email are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(id=user_id, email=email)
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Invalidate any previous unused registration OTPs for this user
+        OTP.objects.filter(
+            user=user,
+            otp_type='email',
+            is_used=False
+        ).update(is_used=True)
+
+        # Generate new OTP
+        otp_code = str(random.randint(100000, 999999))
+        OTP.objects.create(
+            user=user,
+            otp_code=otp_code,
+            otp_type='email'
+        )
+
+        # Send OTP
+        sent = send_email_otp(user.email, otp_code, username=user.username)
+        if sent:
+            logger.info(f"Registration OTP resent to {user.email}")
+        else:
+            logger.info(f"Resent registration OTP for {user.username}: {otp_code}")
+
+        return Response({
+            'message': 'OTP resent to your email' if sent else 'Email service not configured',
+            'otp_code': otp_code if not sent else None,
+        })
+
+
 class CurrentUserView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -539,10 +585,9 @@ class ForgotPasswordView(APIView):
         else:
             logger.info(f"Password reset OTP for {user.username}: {otp_code}")
 
-        # Always return otp_code in development mode for testing
-        from django.conf import settings
-        response_data = {'message': 'OTP sent to your email'}
-        if settings.DEBUG:
+        # Return otp_code when email was not actually sent (no SMTP configured)
+        response_data = {'message': 'OTP sent to your email' if sent else 'Email service not configured'}
+        if not sent:
             response_data['otp_code'] = otp_code
         return Response(response_data)
 

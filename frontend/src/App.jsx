@@ -433,7 +433,7 @@ function ResetPassword({ setToken }) {
 
         {otpCode && (
           <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#10b981', marginBottom: '1rem', padding: '0.5rem', background: '#f0fdf4', borderRadius: '8px' }}>
-            ⚡ Dev Mode: Your OTP is <strong>{otpCode}</strong>
+            Your OTP code is: <strong>{otpCode}</strong>
           </p>
         )}
 
@@ -1200,11 +1200,27 @@ function EmailVerification() {
   const handleResend = async () => {
     setLoading(true)
     setError('')
+    setSuccess('')
     try {
-      // Re-register to get new OTP (in production, use a dedicated resend endpoint)
-      // For dev mode, user can just re-register
-      setResent(true)
-      setError('Check the console/terminal for the new OTP code (Dev mode)')
+      const res = await fetch(`${API_URL}/resend-registration-otp/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, email })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setResent(true)
+        if (data.otp_code) {
+          setSuccess(`OTP resent! Your code is: ${data.otp_code}`)
+        } else {
+          setSuccess('OTP resent to your email!')
+        }
+      } else {
+        const errData = await res.json()
+        setError(errData.error || 'Failed to resend OTP')
+      }
+    } catch (err) {
+      setError('Something went wrong')
     } finally {
       setLoading(false)
     }
@@ -1228,6 +1244,12 @@ function EmailVerification() {
           <strong style={{ color: '#667eea' }}>{email}</strong>
         </p>
 
+        {otpCode && (
+          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#10b981', marginBottom: '1rem', padding: '0.5rem', background: '#f0fdf4', borderRadius: '8px' }}>
+            Your OTP code is: <strong>{otpCode}</strong>
+          </p>
+        )}
+
         <div className="input-group">
           <span className="input-icon">🔑</span>
           <input
@@ -1239,12 +1261,6 @@ function EmailVerification() {
             required
           />
         </div>
-
-        {otpCode && (
-          <p style={{ textAlign: 'center', fontSize: '0.85rem', color: '#10b981', marginBottom: '1rem', padding: '0.5rem', background: '#f0fdf4', borderRadius: '8px' }}>
-            ⚡ Dev Mode: Your OTP is <strong>{otpCode}</strong>
-          </p>
-        )}
 
         {error && <p className="error">{error}</p>}
         {success && <p className="success">{success}</p>}
@@ -2012,7 +2028,11 @@ function Settings({ user, token }) {
       if (res.ok) {
         const data = await res.json()
         setOtpSent(true)
-        showMsg('success', `OTP sent! (Dev: ${data.otp_code})`)
+        if (data.otp_code) {
+          showMsg('success', `OTP sent! Your code is: ${data.otp_code}`)
+        } else {
+          showMsg('success', `OTP sent to your ${otpType}!`)
+        }
       } else {
         const err = await res.json()
         showMsg('error', Object.values(err).flat().join(', '))

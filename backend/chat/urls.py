@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('register/', views.RegisterView.as_view(), name='register'),
     path('verify-registration-email/', views.RegistrationOTPVerifyView.as_view(), name='verify-registration-email'),
+    path('resend-registration-otp/', views.ResendRegistrationOTPView.as_view(), name='resend-registration-otp'),
     path('user/', views.CurrentUserView.as_view(), name='current-user'),
     path('users/', views.UserListView.as_view(), name='user-list'),
     path('friend-requests/', views.FriendRequestListCreateView.as_view(),
