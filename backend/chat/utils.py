@@ -6,19 +6,90 @@ from urllib.error import URLError, HTTPError
 
 logger = logging.getLogger(__name__)
 
+EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'resend')
+
+
+def _send_via_sendgrid(api_key, from_email, recipient_email, subject, text, html):
+    payload = {
+        "personalizations": [{"to": [{"email": recipient_email}]}],
+        "from": {"email": from_email, "name": "Civil_2026 Chatting"},
+        "subject": subject,
+        "content": [
+            {"type": "text/plain", "value": text},
+            {"type": "text/html", "value": html},
+        ],
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = Request(
+        'https://api.sendgrid.com/v3/mail/send',
+        data=data,
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+        },
+        method='POST',
+    )
+    resp = urlopen(req, timeout=15)
+    return resp.status
+
+
+def _send_via_resend(api_key, from_email, recipient_email, subject, text, html):
+    payload = {
+        "from": from_email,
+        "to": [recipient_email],
+        "subject": subject,
+        "text": text,
+        "html": html,
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = Request(
+        'https://api.resend.com/emails',
+        data=data,
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+        },
+        method='POST',
+    )
+    resp = urlopen(req, timeout=15)
+    return resp.status
+
+
+def _send_via_brevo(api_key, from_email, recipient_email, subject, text, html):
+    payload = {
+        "sender": {"email": from_email, "name": "Civil_2026 Chatting"},
+        "to": [{"email": recipient_email}],
+        "subject": subject,
+        "textContent": text,
+        "htmlContent": html,
+    }
+    data = json.dumps(payload).encode('utf-8')
+    req = Request(
+        'https://api.brevo.com/v3/smtp/email',
+        data=data,
+        headers={
+            'api-key': api_key,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+        },
+        method='POST',
+    )
+    resp = urlopen(req, timeout=15)
+    return resp.status
+
 
 def send_email_otp(recipient_email, otp_code, username=None):
     """
-    Send OTP via email using SendGrid API (HTTP, works on Render free tier).
+    Send OTP via email using HTTP API (works on Render free tier).
+    Supports: resend, sendgrid, brevo
     Falls back to logging if not configured.
-    Returns True if sent successfully, False otherwise.
     """
-    api_key = os.getenv('SENDGRID_API_KEY', '')
-    from_email = os.getenv('FROM_EMAIL', os.getenv('SMTP_USER', ''))
-    from_name = 'Civil_2026 Chatting'
+    provider = os.getenv('EMAIL_PROVIDER', 'resend')
+    api_key = os.getenv('SENDGRID_API_KEY', '') or os.getenv('RESEND_API_KEY', '') or os.getenv('BREVO_API_KEY', '')
+    from_email = os.getenv('FROM_EMAIL', '')
 
     if not api_key or not from_email:
-        logger.info(f"SendGrid not configured. OTP for {recipient_email}: {otp_code}")
+        logger.info(f"No email API configured. OTP for {recipient_email}: {otp_code}")
         return False
 
     greeting = f"Hi {username}," if username else "Hi there,"
@@ -66,36 +137,28 @@ Civil_2026 Chatting Team
 </body>
 </html>"""
 
-    payload = {
-        "personalizations": [{"to": [{"email": recipient_email}]}],
-        "from": {"email": from_email, "name": from_name},
-        "subject": "Your OTP Code - Civil_2026 Chatting",
-        "content": [
-            {"type": "text/plain", "value": text_content},
-            {"type": "text/html", "value": html_content},
-        ],
-    }
+    subject = 'Your OTP Code - Civil_2026 Chatting'
+    from_addr = f"Civil_2026 Chatting <{from_email}>"
 
     try:
-        data = json.dumps(payload).encode('utf-8')
-        req = Request(
-            'https://api.sendgrid.com/v3/mail/send',
-            data=data,
-            headers={
-                'Authorization': f'Bearer {api_key}',
-                'Content-Type': 'application/json',
-            },
-            method='POST',
-        )
-        resp = urlopen(req, timeout=15)
-        logger.info(f"OTP email sent to {recipient_email} (status: {resp.status})")
+        if provider == 'resend':
+            status = _send_via_resend(api_key, from_addr, recipient_email, subject, text_content, html_content)
+        elif provider == 'sendgrid':
+            status = _send_via_sendgrid(api_key, from_email, recipient_email, subject, text_content, html_content)
+        elif provider == 'brevo':
+            status = _send_via_brevo(api_key, from_email, recipient_email, subject, text_content, html_content)
+        else:
+            logger.error(f"Unknown email provider: {provider}")
+            return False
+
+        logger.info(f"OTP email sent to {recipient_email} via {provider} (status: {status})")
         return True
     except HTTPError as e:
         body = e.read().decode('utf-8', errors='replace') if hasattr(e, 'read') else ''
-        logger.error(f"SendGrid HTTP error {e.code} for {recipient_email}: {body[:500]}")
+        logger.error(f"{provider} HTTP error {e.code} for {recipient_email}: {body[:500]}")
         return False
     except URLError as e:
-        logger.error(f"SendGrid request failed for {recipient_email}: {e}")
+        logger.error(f"{provider} request failed for {recipient_email}: {e}")
         return False
     except Exception as e:
         logger.error(f"Failed to send email to {recipient_email}: {type(e).__name__}: {e}")
@@ -120,7 +183,7 @@ def send_sms_otp(phone_number, otp_code, country_code='+1'):
         from twilio.rest import Client
         client = Client(twilio_sid, twilio_token)
         full_number = f"{country_code}{phone_number}"
-        
+
         message = client.messages.create(
             body=f"Your OTP for Civil_2026 Chatting is: {otp_code}. Valid for 10 minutes.",
             from_=twilio_from,
