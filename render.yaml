@@ -28,7 +28,7 @@ services:
       - key: SMTP_HOST
         value: "smtp.gmail.com"
       - key: SMTP_PORT
-        value: "587"
+        value: "465"
       - key: SMTP_USER
         value: "otpsender513@gmail.com"
       - key: SMTP_PASS

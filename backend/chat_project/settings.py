@@ -112,8 +112,9 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50MB
 # Email Configuration (SMTP for OTP sending)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-EMAIL_PORT = int(os.getenv('SMTP_PORT', '587'))
-EMAIL_USE_TLS = True
+EMAIL_PORT = int(os.getenv('SMTP_PORT', '465'))
+EMAIL_USE_TLS = False
+EMAIL_USE_SSL = True
 EMAIL_HOST_USER = os.getenv('SMTP_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('SMTP_PASS', '')
 DEFAULT_FROM_EMAIL = os.getenv('FROM_EMAIL', EMAIL_HOST_USER)

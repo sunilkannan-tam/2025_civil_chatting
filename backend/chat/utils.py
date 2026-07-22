@@ -1,10 +1,13 @@
 import os
+import socket
 import smtplib
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
 logger = logging.getLogger(__name__)
+
+socket.setdefaulttimeout(15)
 
 
 def send_email_otp(recipient_email, otp_code, username=None):
@@ -13,7 +16,7 @@ def send_email_otp(recipient_email, otp_code, username=None):
     Falls back to console logging if email is not configured.
     Returns True if sent successfully, False otherwise.
     """
-    smtp_host = os.getenv('SMTP_HOST', '')
+    smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
     smtp_port = os.getenv('SMTP_PORT', '587')
     smtp_user = os.getenv('SMTP_USER', '')
     smtp_pass = os.getenv('SMTP_PASS', '')
@@ -88,9 +91,9 @@ Civil_2026 Chatting Team
 
         port = int(smtp_port)
         if port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, port)
+            server = smtplib.SMTP_SSL(smtp_host, port, timeout=15)
         else:
-            server = smtplib.SMTP(smtp_host, port)
+            server = smtplib.SMTP(smtp_host, port, timeout=15)
             server.starttls()
         
         server.login(smtp_user, smtp_pass)
