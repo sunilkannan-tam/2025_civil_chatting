@@ -1,40 +1,29 @@
 import os
-import socket
-import smtplib
 import logging
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import json
+from urllib.request import Request, urlopen
+from urllib.error import URLError
 
 logger = logging.getLogger(__name__)
-
-socket.setdefaulttimeout(15)
 
 
 def send_email_otp(recipient_email, otp_code, username=None):
     """
-    Send OTP via email using SMTP.
-    Falls back to console logging if email is not configured.
+    Send OTP via email using SendGrid API (HTTP, works on Render free tier).
+    Falls back to logging if not configured.
     Returns True if sent successfully, False otherwise.
     """
-    smtp_host = os.getenv('SMTP_HOST', 'smtp.gmail.com')
-    smtp_port = os.getenv('SMTP_PORT', '587')
-    smtp_user = os.getenv('SMTP_USER', '')
-    smtp_pass = os.getenv('SMTP_PASS', '')
-    from_email = os.getenv('FROM_EMAIL', smtp_user)
+    api_key = os.getenv('SENDGRID_API_KEY', '')
+    from_email = os.getenv('FROM_EMAIL', os.getenv('SMTP_USER', ''))
+    from_name = 'Civil_2026 Chatting'
 
-    if not smtp_host or not smtp_user or not smtp_pass:
-        logger.info(f"Email not configured. OTP for {recipient_email}: {otp_code}")
+    if not api_key or not from_email:
+        logger.info(f"SendGrid not configured. OTP for {recipient_email}: {otp_code}")
         return False
 
-    try:
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = 'Your OTP Code - Civil_2026 Chatting'
-        msg['From'] = from_email
-        msg['To'] = recipient_email
+    greeting = f"Hi {username}," if username else "Hi there,"
 
-        greeting = f"Hi {username}," if username else "Hi there,"
-        
-        text_content = f"""
+    text_content = f"""
 {greeting}
 
 Your One-Time Password (OTP) for Civil_2026 Chatting is:
@@ -48,8 +37,7 @@ If you did not request this code, please ignore this email.
 Best regards,
 Civil_2026 Chatting Team
 """
-        html_content = f"""
-<!DOCTYPE html>
+    html_content = f"""<!DOCTYPE html>
 <html>
 <head>
     <style>
@@ -65,54 +53,45 @@ Civil_2026 Chatting Team
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>💬 Civil_2026 Chatting</h1>
-        </div>
+        <div class="header"><h1>Civil_2026 Chatting</h1></div>
         <div class="body">
             <p>{greeting}</p>
             <p>Your One-Time Password (OTP) is:</p>
-            <div class="otp-box">
-                <div class="otp-code">{otp_code}</div>
-            </div>
+            <div class="otp-box"><div class="otp-code">{otp_code}</div></div>
             <p>This code is valid for <strong>10 minutes</strong>.</p>
             <p>If you did not request this code, please ignore this email.</p>
         </div>
-        <div class="footer">
-            <p>Civil_2026 Chatting - Secure Messaging Platform</p>
-        </div>
+        <div class="footer"><p>Civil_2026 Chatting - Secure Messaging Platform</p></div>
     </div>
 </body>
-</html>
-"""
-        part1 = MIMEText(text_content, 'plain')
-        part2 = MIMEText(html_content, 'html')
-        msg.attach(part1)
-        msg.attach(part2)
+</html>"""
 
-        port = int(smtp_port)
-        if port == 465:
-            server = smtplib.SMTP_SSL(smtp_host, port, timeout=15)
-        else:
-            server = smtplib.SMTP(smtp_host, port, timeout=15)
-            server.starttls()
-        
-        server.login(smtp_user, smtp_pass)
-        server.sendmail(from_email, recipient_email, msg.as_string())
-        server.quit()
-        
-        logger.info(f"OTP email sent to {recipient_email}")
+    payload = {
+        "personalizations": [{"to": [{"email": recipient_email}]}],
+        "from": {"email": from_email, "name": from_name},
+        "subject": "Your OTP Code - Civil_2026 Chatting",
+        "content": [
+            {"type": "text/plain", "value": text_content},
+            {"type": "text/html", "value": html_content},
+        ],
+    }
+
+    try:
+        data = json.dumps(payload).encode('utf-8')
+        req = Request(
+            'https://api.sendgrid.com/v3/mail/send',
+            data=data,
+            headers={
+                'Authorization': f'Bearer {api_key}',
+                'Content-Type': 'application/json',
+            },
+            method='POST',
+        )
+        resp = urlopen(req, timeout=15)
+        logger.info(f"OTP email sent to {recipient_email} (status: {resp.status})")
         return True
-    except smtplib.SMTPAuthenticationError as e:
-        logger.error(f"SMTP auth error for {recipient_email}: {e}")
-        return False
-    except smtplib.SMTPConnectError as e:
-        logger.error(f"SMTP connect error for {recipient_email}: {e}")
-        return False
-    except socket.timeout as e:
-        logger.error(f"SMTP timeout for {recipient_email}: {e}")
-        return False
-    except socket.gaierror as e:
-        logger.error(f"DNS error for {recipient_email}: {e}")
+    except URLError as e:
+        logger.error(f"SendGrid request failed for {recipient_email}: {e}")
         return False
     except Exception as e:
         logger.error(f"Failed to send email to {recipient_email}: {type(e).__name__}: {e}")

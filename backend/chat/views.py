@@ -694,7 +694,7 @@ class AdminCallHistoryListView(APIView):
 
 class TestEmailView(APIView):
     """
-    Test email sending. Send a test OTP to verify SMTP config works.
+    Test email sending via SendGrid API or SMTP.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -703,52 +703,13 @@ class TestEmailView(APIView):
         if not email:
             return Response({'error': 'email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        import socket as _socket
-        import smtplib as _smtplib
         test_otp = str(random.randint(100000, 999999))
-
-        smtp_host = os.getenv('SMTP_HOST', '')
-        smtp_port = os.getenv('SMTP_PORT', '465')
-        smtp_user = os.getenv('SMTP_USER', '')
-        smtp_pass = os.getenv('SMTP_PASS', '')
-
-        # Direct debug: try connecting
-        debug_info = {}
-        try:
-            _socket.setdefaulttimeout(10)
-            port = int(smtp_port)
-            debug_info['step'] = 'connecting'
-            if port == 465:
-                server = _smtplib.SMTP_SSL(smtp_host, port, timeout=10)
-            else:
-                server = _smtplib.SMTP(smtp_host, port, timeout=10)
-                server.starttls()
-            debug_info['step'] = 'connected'
-            server.login(smtp_user, smtp_pass)
-            debug_info['step'] = 'logged_in'
-            from_email = os.getenv('FROM_EMAIL', smtp_user)
-            from email.mime.multipart import MIMEMultipart
-            from email.mime.text import MIMEText
-            msg = MIMEMultipart('alternative')
-            msg['Subject'] = 'Test OTP'
-            msg['From'] = from_email
-            msg['To'] = email
-            msg.attach(MIMEText(f'OTP: {test_otp}', 'plain'))
-            server.sendmail(from_email, email, msg.as_string())
-            server.quit()
-            sent = True
-            debug_info['step'] = 'sent'
-        except Exception as e:
-            sent = False
-            debug_info['error'] = f'{type(e).__name__}: {str(e)}'
+        sent = send_email_otp(email, test_otp, username='Test')
 
         return Response({
             'sent': sent,
             'otp_code': test_otp,
-            'debug': debug_info,
-            'smtp_host': smtp_host,
-            'smtp_port': smtp_port,
-            'smtp_user': smtp_user,
-            'smtp_pass_set': bool(smtp_pass),
-            'from_email': os.getenv('FROM_EMAIL', 'NOT SET'),
+            'message': 'Email sent successfully' if sent else 'Email failed',
+            'sendgrid_configured': bool(os.getenv('SENDGRID_API_KEY', '')),
+            'from_email': os.getenv('FROM_EMAIL', os.getenv('SMTP_USER', 'NOT SET')),
         })

@@ -11,3 +11,4 @@ gunicorn==21.2.0
 dj-database-url==2.1.0
 whitenoise==6.6.0
 Pillow==10.3.0
+sendgrid==6.12.5

@@ -35,6 +35,13 @@ services:
         value: "knoe mmvh iwvf wffp"
       - key: FROM_EMAIL
         value: "otpsender513@gmail.com"
+      # SendGrid API (primary email - Render blocks SMTP)
+      # 1. Sign up free at https://signup.sendgrid.com
+      # 2. Go to Settings > Sender Authentication > verify otpsender513@gmail.com
+      # 3. Go to Settings > API Keys > Create API Key
+      # 4. Set SENDGRID_API_KEY in Render dashboard below
+      - key: SENDGRID_API_KEY
+        sync: false
 
   # Frontend Static Site
   - type: web
