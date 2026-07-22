@@ -34,10 +34,10 @@ services:
       - key: SMTP_PASS
         value: "knoe mmvh iwvf wffp"
       - key: FROM_EMAIL
-        value: "onboarding@resend.dev"
+        value: "otpsender513@gmail.com"
       # Email API provider (resend/sendgrid/brevo) - Render blocks SMTP
       - key: EMAIL_PROVIDER
-        value: "resend"
+        value: "brevo"
       - key: RESEND_API_KEY
         sync: false
       - key: SENDGRID_API_KEY
