@@ -2,7 +2,7 @@ import os
 import logging
 import json
 from urllib.request import Request, urlopen
-from urllib.error import URLError
+from urllib.error import URLError, HTTPError
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,10 @@ Civil_2026 Chatting Team
         resp = urlopen(req, timeout=15)
         logger.info(f"OTP email sent to {recipient_email} (status: {resp.status})")
         return True
+    except HTTPError as e:
+        body = e.read().decode('utf-8', errors='replace') if hasattr(e, 'read') else ''
+        logger.error(f"SendGrid HTTP error {e.code} for {recipient_email}: {body[:500]}")
+        return False
     except URLError as e:
         logger.error(f"SendGrid request failed for {recipient_email}: {e}")
         return False

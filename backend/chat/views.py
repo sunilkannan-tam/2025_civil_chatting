@@ -694,7 +694,7 @@ class AdminCallHistoryListView(APIView):
 
 class TestEmailView(APIView):
     """
-    Test email sending via SendGrid API or SMTP.
+    Test email sending via SendGrid API.
     """
     permission_classes = [permissions.AllowAny]
 
@@ -703,13 +703,72 @@ class TestEmailView(APIView):
         if not email:
             return Response({'error': 'email is required'}, status=status.HTTP_400_BAD_REQUEST)
 
-        test_otp = str(random.randint(100000, 999999))
-        sent = send_email_otp(email, test_otp, username='Test')
+        api_key = os.getenv('SENDGRID_API_KEY', '')
+        from_email = os.getenv('FROM_EMAIL', os.getenv('SMTP_USER', ''))
 
-        return Response({
-            'sent': sent,
-            'otp_code': test_otp,
-            'message': 'Email sent successfully' if sent else 'Email failed',
-            'sendgrid_configured': bool(os.getenv('SENDGRID_API_KEY', '')),
-            'from_email': os.getenv('FROM_EMAIL', os.getenv('SMTP_USER', 'NOT SET')),
-        })
+        if not api_key:
+            return Response({
+                'sent': False,
+                'error': 'SENDGRID_API_KEY not set on Render',
+                'sendgrid_configured': False,
+            })
+
+        if not from_email:
+            return Response({
+                'sent': False,
+                'error': 'FROM_EMAIL not set',
+                'sendgrid_configured': True,
+            })
+
+        # Direct SendGrid API call with error capture
+        import json as _json
+        from urllib.request import Request, urlopen
+        from urllib.error import HTTPError, URLError
+
+        test_otp = str(random.randint(100000, 999999))
+        payload = {
+            "personalizations": [{"to": [{"email": email}]}],
+            "from": {"email": from_email, "name": "Civil_2026 Chatting"},
+            "subject": "Test OTP - Civil_2026 Chatting",
+            "content": [
+                {"type": "text/plain", "value": f"Your OTP is: {test_otp}"},
+                {"type": "text/html", "value": f"<h2>Your OTP is: <b>{test_otp}</b></h2>"},
+            ],
+        }
+
+        try:
+            data = _json.dumps(payload).encode('utf-8')
+            req = Request(
+                'https://api.sendgrid.com/v3/mail/send',
+                data=data,
+                headers={
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json',
+                },
+                method='POST',
+            )
+            resp = urlopen(req, timeout=15)
+            return Response({
+                'sent': True,
+                'otp_code': test_otp,
+                'status': resp.status,
+                'message': f'Email sent to {email}',
+            })
+        except HTTPError as e:
+            body = e.read().decode('utf-8', errors='replace') if hasattr(e, 'read') else ''
+            return Response({
+                'sent': False,
+                'otp_code': test_otp,
+                'error': f'SendGrid HTTP {e.code}: {body[:300]}',
+                'from_email': from_email,
+            })
+        except URLError as e:
+            return Response({
+                'sent': False,
+                'error': f'Network error: {str(e)}',
+            })
+        except Exception as e:
+            return Response({
+                'sent': False,
+                'error': f'{type(e).__name__}: {str(e)}',
+            })
