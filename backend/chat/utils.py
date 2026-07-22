@@ -151,8 +151,6 @@ Civil_2026 Chatting Team
 
     try:
         headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json',
             'User-Agent': 'Civil2026-Chatting/1.0',
         }
 
