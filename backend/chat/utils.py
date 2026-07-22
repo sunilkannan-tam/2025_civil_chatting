@@ -92,8 +92,9 @@ def send_email_otp(recipient_email, otp_code, username=None):
     }
     api_key = os.getenv(key_map.get(provider, 'RESEND_API_KEY'), '')
 
+    logger.info(f"send_email_otp called: provider={provider}, from={from_email}, to={recipient_email}, has_key={bool(api_key)}")
     if not api_key or not from_email:
-        logger.info(f"No email API configured. OTP for {recipient_email}: {otp_code}")
+        logger.warning(f"No email API configured (api_key={bool(api_key)}, from_email={bool(from_email)}). OTP for {recipient_email}: {otp_code}")
         return False
 
     # Resend free tier requires onboarding@resend.dev (can't use gmail.com)
@@ -165,17 +166,19 @@ Civil_2026 Chatting Team
             logger.error(f"Unknown email provider: {provider}")
             return False
 
-        logger.info(f"OTP email sent to {recipient_email} via {provider} (status: {status})")
+        logger.info(f"OTP email sent to {recipient_email} via {provider} (status: {status}, from_addr={from_addr})")
         return True
     except HTTPError as e:
         body = e.read().decode('utf-8', errors='replace') if hasattr(e, 'read') else ''
         logger.error(f"{provider} HTTP error {e.code} for {recipient_email}: {body[:500]}")
+        logger.error(f"{provider} URL: {e.url if hasattr(e, 'url') else 'unknown'}, code: {e.code}, headers: {dict(e.headers) if hasattr(e, 'headers') else {}}")
         return False
     except URLError as e:
         logger.error(f"{provider} request failed for {recipient_email}: {e}")
+        logger.error(f"{provider} URLError reason: {getattr(e, 'reason', 'unknown')}")
         return False
     except Exception as e:
-        logger.error(f"Failed to send email to {recipient_email}: {type(e).__name__}: {e}")
+        logger.error(f"Failed to send email to {recipient_email}: {type(e).__name__}: {e}", exc_info=True)
         return False
 
 
