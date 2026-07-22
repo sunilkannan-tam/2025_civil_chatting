@@ -44,11 +44,12 @@ class PresenceConsumer(AsyncWebsocketConsumer):
         if self.user.is_authenticated:
             await set_user_online(self.user)
             await self.accept()
-            # Add user to a presence group (for future use)
             await self.channel_layer.group_add(
                 'presence',
                 self.channel_name
             )
+        else:
+            await self.close()
 
     async def disconnect(self, close_code):
         if self.user.is_authenticated:
@@ -58,6 +59,16 @@ class PresenceConsumer(AsyncWebsocketConsumer):
                 self.channel_name
             )
 
+    async def call_signal(self, event):
+        if self.user.id == event.get('target_user_id'):
+            await self.send(text_data=json.dumps({
+                'type': 'call_signal',
+                'from_user_id': event['from_user_id'],
+                'signal_type': event['signal_type'],
+                'signal_data': event['signal_data'],
+                'chat_id': event.get('chat_id')
+            }))
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
     async def connect(self):
@@ -65,7 +76,17 @@ class ChatConsumer(AsyncWebsocketConsumer):
         self.user = self.scope['user']
         self.chat_group_name = f'chat_{self.chat_id}'
 
-        # Join room group
+        if not self.user.is_authenticated:
+            await self.close()
+            return
+
+        chat_exists = await database_sync_to_async(
+            lambda: Chat.objects.filter(id=self.chat_id).exists()
+        )()
+        if not chat_exists:
+            await self.close()
+            return
+
         await self.channel_layer.group_add(
             self.chat_group_name,
             self.channel_name
